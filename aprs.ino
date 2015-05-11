@@ -1,8 +1,7 @@
 
-/* From Project Swift - High altitude balloon flight software                 */
+/* From Project Swift - High altitude balloon flight software            */
 /*=======================================================================*/
-/* Copyright 2010-2012 Philip Heron <phil@sanslogic.co.uk>               */
-/*                     Nigel Smart <nigel@projectswift.co.uk>            */
+/* Copyright 2010-2015 Philip Heron <phil@sanslogic.co.uk>               */
 /*                                                                       */
 /* This program is free software: you can redistribute it and/or modify  */
 /* it under the terms of the GNU General Public License as published by  */
@@ -16,7 +15,6 @@
 /*                                                                       */
 /* You should have received a copy of the GNU General Public License     */
 /* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
 
 #ifdef APRS_DATA
 
@@ -33,6 +31,13 @@
 #define PHASE_DELTA_1200 (((TABLE_SIZE * 1200L) << 7) / PLAYBACK_RATE)
 #define PHASE_DELTA_2200 (((TABLE_SIZE * 2200L) << 7) / PLAYBACK_RATE)
 #define PHASE_DELTA_XOR  (PHASE_DELTA_1200 ^ PHASE_DELTA_2200)
+
+#define APRS_DEVID "APEHAB"
+
+/* External variables */
+extern int DS18B20_Temperatures[];
+extern unsigned int Channel0Average;
+/* These and an extern for GPS should be in a common include file */
 
 // Our variables
 
@@ -72,6 +77,18 @@ void CheckAPRS(void)
     
     tx_aprs();
   }
+}
+
+static uint8_t *_ax25_callsign(uint8_t *s, char *callsign, char ssid)
+{
+  char i;
+  for(i = 0; i < 6; i++)
+  {
+    if(*callsign) *(s++) = *(callsign++) << 1;
+    else *(s++) = ' ' << 1;
+  }
+  *(s++) = ('0' + ssid) << 1;
+  return(s);
 }
 
 void ax25_frame(char *scallsign, char sssid, char *dcallsign, char dssid, char *path1, char ttl1, char *path2, char ttl2, char *data, ...)
@@ -136,22 +153,50 @@ void tx_aprs(void)
 
   /* Construct the compressed telemetry format */
   ax25_base91enc(stlm + 0, 2, seq);
-    ax25_frame(
+  ax25_base91enc(stlm + 2, 2, GPS.Satellites);
+  ax25_base91enc(stlm + 4, 2, DS18B20_Temperatures[0]);
+  ax25_base91enc(stlm + 6, 2, Channel0Average);
+  ax25_frame(
     APRS_CALLSIGN, APRS_SSID,
-    "APRS", 0,
+    APRS_DEVID, 0,
     //0, 0, 0, 0,
     "WIDE1", 1, "WIDE2",1,
     //"WIDE2", 1,
     "!/%s%sO   /A=%06ld|%s|%s/%s,%d',www.daveakerman.com",
     ax25_base91enc(slat, 4, aprs_lat),
     ax25_base91enc(slng, 4, aprs_lon),
-    aprs_alt, stlm, comment,APRS_CALLSIGN, ++APRSSentenceCounter);
+    aprs_alt, stlm, comment,APRS_CALLSIGN, ++APRSSentenceCounter
+  );
+
+  /* Send the telemetry definitions every 10 packets */
+  if(seq % 10 == 0)
+  {
+    char s[10];
+
+    /* Need CALLSIGN-SSID as string */
+    strncpy_P(s, PSTR(APRS_CALLSIGN), 7);
+    if(APRS_SSID) snprintf_P(s + strlen(s), 4, PSTR("-%i"), APRS_SSID);
+
+    /* Transmit telemetry definitions */
+    ax25_frame(
+      APRS_CALLSIGN, APRS_SSID,
+      APRS_DEVID, 0,
+      0, 0, 0, 0,
+      ":%-9s:PARM.Sats,Temp,Batt", s
+    );
+    ax25_frame(
+      APRS_CALLSIGN, APRS_SSID,
+      APRS_DEVID, 0,
+      0, 0, 0, 0,
+      ":%-9s:UNIT.Sats,C,mV", s
+    );
+  }
+
   seq++;
 }
 
 ISR(TIMER2_OVF_vect)
 {
-
   static uint16_t phase  = 0;
   static uint16_t step   = PHASE_DELTA_1200;
   static uint16_t sample = 0;
@@ -159,6 +204,7 @@ ISR(TIMER2_OVF_vect)
   static uint8_t byte;
   static uint8_t bit     = 7;
   static int8_t bc       = 0;
+
   /* Update the PWM output */
   OCR2B = pgm_read_byte(&_sine_table[(phase >> 7) & 0x1FF]);
   phase += step;
@@ -226,6 +272,7 @@ ISR(TIMER2_OVF_vect)
 
   byte >>= 1;
 }
+
 char *ax25_base91enc(char *s, uint8_t n, uint32_t v)
 {
   /* Creates a Base-91 representation of the value in v in the string */
@@ -237,18 +284,6 @@ char *ax25_base91enc(char *s, uint8_t n, uint32_t v)
     v /= 91;
   }
 
-  return(s);
-}
-
-static uint8_t *_ax25_callsign(uint8_t *s, char *callsign, char ssid)
-{
-  char i;
-  for(i = 0; i < 6; i++)
-  {
-    if(*callsign) *(s++) = *(callsign++) << 1;
-    else *(s++) = ' ' << 1;
-  }
-  *(s++) = ('0' + ssid) << 1;
   return(s);
 }
 
