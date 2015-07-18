@@ -100,6 +100,9 @@ void ax25_frame(char *scallsign, char sssid, char *dcallsign, char dssid, char *
 
   va_start(va, data);
 
+  /* Pause while there is still data transmitting */
+  while(_txlen);
+
   /* Write in the callsigns and paths */
   s = _ax25_callsign(frame, dcallsign, dssid);
   s = _ax25_callsign(s, scallsign, sssid);
@@ -126,30 +129,25 @@ void ax25_frame(char *scallsign, char sssid, char *dcallsign, char dssid, char *
   _txbuf = frame;
   _txlen = s - frame;
 
-  /* Enable the timer and key the radio */
+  /* Key the radio and enable the AX25 timer interrupt */
+  digitalWrite(APRS_ENABLE, 1);
   TIMSK2 |= _BV(TOIE2);
-  //PORTA |= TXENABLE;
 }
 
 void tx_aprs(void)
 {
   aprstxstatus=1;
-  char comment[3]={' ', ' ', '\0'};
   
-  digitalWrite(APRS_ENABLE, 1);
   char slat[5];
   char slng[5];
   char stlm[9];
   static uint16_t seq = 0;
-  double aprs_lat, aprs_lon;
+  int32_t aprs_lat, aprs_lon, aprs_alt;
 
-  // Convert the UBLOX-style coordinates to the APRS compressed format
-  aprs_lat = 900000000 - GPS.Latitude * 10000000;
-  aprs_lat = aprs_lat / 26 - aprs_lat / 2710 + aprs_lat / 15384615;
-  aprs_lon = 900000000 + GPS.Longitude  * 10000000 / 2;
-  aprs_lon = aprs_lon / 26 - aprs_lon / 2710 + aprs_lon / 15384615;
-  int32_t aprs_alt = GPS.Altitude * 32808 / 10000;
-
+  // Convert the coordinates to the APRS compressed format
+  aprs_lat = 380926 * (90.0 - GPS.Latitude);
+  aprs_lon = 190463 * (180.0 - GPS.Longitude);
+  aprs_alt = GPS.Altitude * 32808 / 10000;
 
   /* Construct the compressed telemetry format */
   ax25_base91enc(stlm + 0, 2, seq);
@@ -162,14 +160,14 @@ void tx_aprs(void)
     //0, 0, 0, 0,
     "WIDE1", 1, "WIDE2",1,
     //"WIDE2", 1,
-    "!/%s%sO   /A=%06ld|%s|%s/%s,%d',www.daveakerman.com",
+    "!/%s%sO   /A=%06ld|%s|%s",
     ax25_base91enc(slat, 4, aprs_lat),
     ax25_base91enc(slng, 4, aprs_lon),
-    aprs_alt, stlm, comment,APRS_CALLSIGN, ++APRSSentenceCounter
+    aprs_alt, stlm, APRS_COMMENT
   );
 
   /* Send the telemetry definitions every 10 packets */
-  if(seq % 10 == 0)
+  if(seq % (APRS_TELEM_INTERVAL) == 0)
   {
     char s[10];
 
@@ -182,13 +180,19 @@ void tx_aprs(void)
       APRS_CALLSIGN, APRS_SSID,
       APRS_DEVID, 0,
       0, 0, 0, 0,
-      ":%-9s:PARM.Sats,Temp,Batt", s
+      ":%-9s:PARM.Satellites,Temperature,Battery", s
     );
     ax25_frame(
       APRS_CALLSIGN, APRS_SSID,
       APRS_DEVID, 0,
       0, 0, 0, 0,
-      ":%-9s:UNIT.Sats,C,mV", s
+      ":%-9s:UNIT.Sats,deg.C,Volts", s
+    );
+    ax25_frame(
+      APRS_CALLSIGN, APRS_SSID,
+      APRS_DEVID, 0,
+      0, 0, 0, 0,
+      ":%-9s:EQNS.0,1,0,0,1,0,0,0.001,0", s
     );
   }
 
@@ -204,9 +208,13 @@ ISR(TIMER2_OVF_vect)
   static uint8_t byte;
   static uint8_t bit     = 7;
   static int8_t bc       = 0;
+  uint8_t sin;
 
   /* Update the PWM output */
-  OCR2B = pgm_read_byte(&_sine_table[(phase >> 7) & 0x1FF]);
+  sin = pgm_read_byte(&_sine_table[(phase >> 7) & 0x1FF]);
+  if(step == PHASE_DELTA_1200) sin = (sin >> 1) + 64; /* Crude pre-emphasis */
+  OCR2B = sin;
+
   phase += step;
 
   if(++sample < SAMPLES_PER_BAUD) return;

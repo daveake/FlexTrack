@@ -20,8 +20,13 @@
 #define APRS_CALLSIGN    "ME_TOO"           
 #define APRS_SSID            11
 #define APRS_TX_INTERVAL      1                // APRS TX Interval in minutes
+#define APRS_TELEM_INTERVAL  10                // APRX TS Telemetry definition data, every X packets
+#define APRS_COMMENT     "www.daveakerman.com"
 
+/* Uncomment only one */
 #define HABDUINO
+//#define AX25DUINO
+//#define LORADUINO
 
 #ifdef HABDUINO
   #define LED_WARN           12
@@ -41,7 +46,19 @@
   
   #define MTX2
   #define RTTY_FREQUENCY    434.65
-#else
+#endif
+
+#ifdef AX25DUINO
+  #define LED_WARN           17
+  #define LED_OK             16
+  #define GPS_I2C            1
+  #define APRS_ENABLE         6
+  #define APRS_DATA           3                // Comment out to disable APRS
+  #define A0_MULTIPLIER      4.9
+  #define WIREBUS             5
+#endif
+
+#ifdef LORADUINO
   // GPS Section
   #define  GPS_I2C  1                          // Comment out if using serial GPS
 
