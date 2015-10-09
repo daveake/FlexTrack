@@ -10,7 +10,8 @@
 // Include i2c library, if using it
 
 #ifdef GPS_I2C
-  #include <Wire.h>
+//  #include <Wire.h>
+  #include <I2C.h>
 #endif
 
 
@@ -38,19 +39,12 @@ int GPSChecksumOK(char *Buffer, int Count)
 }
 
 void SendUBX(unsigned char *Message, int Length)
-{
-  int i;
-  
+{ 
 #ifdef GPS_I2C  
-  Wire.beginTransmission(0x42);
-  
-  for (i=0; i<Length; i++)
-  {
-    Wire.write(Message[i]);
-  }
-  
-  Wire.endTransmission();     
+  I2c.write(0x42, 0, Message, Length);
 #else
+  int i;
+
   for (i=0; i<Length; i++)
   {
     Serial.write(Message[i]);
@@ -66,6 +60,22 @@ void SetFlightMode(void)
     Serial.println("Setting flight mode\n");
 }
 
+void SetGNSSMode(void)
+ {
+  // Sets CFG-GNSS to disable everything other than GPS GNSS
+  // solution. Failure to do this means GPS power saving 
+  // doesn't work. Not needed for MAX7, needed for MAX8's
+  uint8_t setGNSS[] = {
+    0xB5, 0x62, 0x06, 0x3E, 0x2C, 0x00, 0x00, 0x00,
+    0x20, 0x05, 0x00, 0x08, 0x10, 0x00, 0x01, 0x00,
+    0x01, 0x01, 0x01, 0x01, 0x03, 0x00, 0x00, 0x00,
+    0x01, 0x01, 0x03, 0x08, 0x10, 0x00, 0x00, 0x00,
+    0x01, 0x01, 0x05, 0x00, 0x03, 0x00, 0x00, 0x00,
+    0x01, 0x01, 0x06, 0x08, 0x0E, 0x00, 0x00, 0x00,
+    0x01, 0x01, 0xFC, 0x11   };
+    SendUBX(setGNSS, sizeof(setGNSS));
+} 
+
 float FixPosition(float Position)
 {
   float Minutes, Seconds;
@@ -80,8 +90,7 @@ float FixPosition(float Position)
 
 void ProcessLine(char *Buffer, int Count)
 {
-  static byte LED_Status=0;
-  int lock, Satellites, date;
+  int Satellites, date;
   char ns, ew;
   char TimeString[16], LatString[16], LongString[16], Temp[4];
 	
@@ -91,10 +100,13 @@ void ProcessLine(char *Buffer, int Count)
 	
     if (strncmp(Buffer+3, "GGA", 3) == 0)
     {
-      char lock;
+      int lock;
       char hdop[16], Altitude[16];
       
       Serial.print(Buffer+1);
+      #ifdef LED_WARN
+        digitalWrite(LED_WARN, GPS.Altitude < 1000);
+      #endif
       
       if (sscanf(Buffer+7, "%16[^,],%16[^,],%c,%[^,],%c,%d,%d,%[^,],%[^,]", TimeString, LatString, &ns, LongString, &ew, &lock, &Satellites, hdop, Altitude) >= 1)
       {	
@@ -106,9 +118,13 @@ void ProcessLine(char *Buffer, int Count)
         Temp[0] = TimeString[4]; Temp[1] = TimeString[5]; Temp[2] = '\0';
         GPS.Seconds = atoi(Temp);
         GPS.SecondsInDay = (unsigned long)GPS.Hours * 3600L + (unsigned long)GPS.Minutes * 60L + (unsigned long)GPS.Seconds;
-        
+
+        #ifdef LED_OK        
+          digitalWrite(LED_OK, GPS.Altitude < 1000);
+        #endif
+
         if (Satellites >= 4)
-	{
+        {
           GPS.Latitude = FixPosition(atof(LatString));
           if (ns == 'S') GPS.Latitude = -GPS.Latitude;
           GPS.Longitude = FixPosition(atof(LongString));
@@ -116,6 +132,7 @@ void ProcessLine(char *Buffer, int Count)
           GPS.Altitude = (unsigned int)atof(Altitude);
         }
         
+        GPS.Lock = lock;
         GPS.Satellites = Satellites;
         GPS.GotTime = 1;
       }
@@ -123,16 +140,6 @@ void ProcessLine(char *Buffer, int Count)
       {
         GPS.GotTime = 0;
       }
-      
-      #ifdef LED_WARN
-        digitalWrite(LED_WARN, (!GPS.GotTime) && LED_Status);
-      #endif
-
-      #ifdef LED_OK
-        digitalWrite(LED_OK, (!GPS.GotTime) || (GPS.Altitude > 1000) ? 0 : LED_Status);
-      #endif
-      
-      LED_Status ^= 1;
     }
     else if (strncmp(Buffer+3, "RMC", 3) == 0)
     {
@@ -191,6 +198,7 @@ void ProcessLine(char *Buffer, int Count)
     }
     else
     {
+      // digitalWrite(LED_WARN, 1);
       // Serial.print("Unknown NMEA sentence: ");
       // Serial.println(Buffer+1);
     }
@@ -211,23 +219,32 @@ void SetupGPS(void)
   
 #ifdef GPS_I2C
   // Init i2c library
-  Wire.begin();
+  // Wire.begin();
+  I2c.begin();
 #endif
   TimeForFlightMode = millis() + 10000L;
+#ifdef POWERSAVING
+  Serial.println("Disabling non GPS GNSS Solutions");
+  SetGNSSMode();
+#endif  
 }
 
 void OpenGPS(void)
 {
 #ifdef GPS_I2C
-  Wire.begin();
-  Wire.requestFrom(0x42, 80);    // request 80 bytes from slave device 0x42 (Ublox default)
+  // Wire.begin();
+  // I2c.begin();
+  
+//  Wire.requestFrom(0x42, 80);    // request 80 bytes from slave device 0x42 (Ublox default)
+  I2c.read(0x42, 32);    // request 80 bytes from slave device 0x42 (Ublox default)
 #endif
 }
 
 int GPSAvailable(void)
 {
 #ifdef GPS_I2C
-  return Wire.available();
+  // return Wire.available();
+  return I2c.available();
 #else  
   return Serial.available();
 #endif
@@ -236,7 +253,8 @@ int GPSAvailable(void)
 char ReadGPS(void)
 {
 #ifdef GPS_I2C
-  return Wire.read();        
+  // return Wire.read();        
+  return I2c.receive();        
 #else
   return Serial.read();
 #endif
@@ -248,6 +266,12 @@ void CheckGPS(void)
   static int Length=0;
   char Character;
 
+  #ifdef LED_OK
+    digitalWrite(LED_OK, 0);
+  #endif
+  #ifdef LED_WARN
+    digitalWrite(LED_WARN, 0);
+  #endif
   OpenGPS();
 
   while(GPSAvailable())
@@ -285,4 +309,114 @@ void CheckGPS(void)
   }
 }
 
+void setGPS_PowerSaveMode(void)
+{
+  // Power Save Mode
+
+  uint8_t setPSM[] = {0xB5, 0x62, 0x06, 0x11, 0x02, 0x00, 0x08, 0x01, 0x22, 0x92}; // Setup for Power Save Mode (Default Cyclic 1s)
+
+  SendUBX(setPSM, sizeof(setPSM)/sizeof(uint8_t));
+}
+
+
+void setGps_MaxPerformanceMode()
+{
+  //Set GPS for Max Performance Mode
+
+  uint8_t setMax[] = {0xB5, 0x62, 0x06, 0x11, 0x02, 0x00, 0x08, 0x00, 0x21, 0x91}; // Setup for Max Power Mode
+
+  SendUBX(setMax, sizeof(setMax)/sizeof(uint8_t));
+}
+
+
+// Main loop (note conditions). 
+// If these conditions aren’t met you need to get it back in max performance mode asap.
+// I did this with a messy but effective routine that flagged if sats dropped below 4 or the time froze.
+// If either of these conditions occurred within 10 loops I put it back in max performance mode.
+// Time freezing is a sure fire guarantee you have issues but I’ve never seen it happen as long as you get back in max performance mode if the sats drops <4
+
+ 
+
+#ifdef POWERSAVING
+void CheckPowerSaving(void)
+{
+  if((GPS.Lock==3) && (GPS.psm_status==0) && (GPS.Satellites>=5) &&((GPS.errorstatus & (1 << 0))==0)&&((GPS.errorstatus & (1 << 1))==0)) // Check we aren't in an error condition
+  {
+    setGPS_PowerSaveMode();
+
+    // wait(1000);
+
+    GPS.psm_status=1;
+
+    GPS.errorstatus &= ~(1 << 4); // Set Bit 4 Indicating PSM is on
+  }
+}
+#endif
+
+
+void checkDynamicModel()
+{
+  if ((GPS.Altitude<=1000) && (GPS.Satellites>4))
+  {
+    if(GPS.navmode != 3)
+    {
+      setGPS_DynamicModel3();
+
+      GPS.errorstatus |=(1 << 3);  // Set Bit 3 indicating we are in pedestrian mode   
+    }
+  }
+  else
+  {
+    if (GPS.navmode != 6)
+    {
+      setGPS_DynamicModel6();
+
+      GPS.errorstatus &= ~(1 << 3); // Unset bit 3 indicating we are in flight mode
+    }
+  }
+}
+
+int getUBX_ACK(uint8_t *Command)
+{
+  return 1;
+}
+
+void setGPS_DynamicModel3()
+{
+  int OK=0;
+
+  uint8_t setdm3[] = {
+    0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x03,
+    0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00,
+    0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x76};
+
+  while(!OK)
+  {
+    SendUBX(setdm3, sizeof(setdm3)/sizeof(uint8_t));
+
+    OK=getUBX_ACK(setdm3);
+  }
+}
+
+
+void setGPS_DynamicModel6()
+{
+  int OK=0;
+
+  uint8_t setdm6[] = {
+    0xB5, 0x62, 0x06, 0x24, 0x24, 0x00, 0xFF, 0xFF, 0x06,
+    0x03, 0x00, 0x00, 0x00, 0x00, 0x10, 0x27, 0x00, 0x00,
+    0x05, 0x00, 0xFA, 0x00, 0xFA, 0x00, 0x64, 0x00, 0x2C,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0xDC};
+
+  while(!OK)
+  {
+    SendUBX(setdm6, sizeof(setdm6)/sizeof(uint8_t));
+
+    OK=getUBX_ACK(setdm6);
+  }
+}
 

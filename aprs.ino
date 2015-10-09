@@ -119,7 +119,14 @@ void tx_aprs(void)
   aprstxstatus=1;
   char comment[3]={' ', ' ', '\0'};
   
+#ifdef LED_TX
+  digitalWrite(LED_TX, 1);
+#endif
+
+#ifdef APRS_ENABLE
   digitalWrite(APRS_ENABLE, 1);
+#endif
+
   char slat[5];
   char slng[5];
   char stlm[9];
@@ -185,7 +192,9 @@ ISR(TIMER2_OVF_vect)
       {
         // Disable radio and interrupt
 
+#ifdef APRS_ENABLE
         digitalWrite(APRS_ENABLE, 0);
+#endif
         aprstxstatus=0;
         TIMSK2 &= ~_BV(TOIE2);
 
