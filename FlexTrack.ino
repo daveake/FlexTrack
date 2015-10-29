@@ -11,9 +11,17 @@
 |                                                                                                        |
 \*------------------------------------------------------------------------------------------------------*/
 
+//------------------------------------------------------------------------------------------------------
+
 // CONFIGURATION SECTION.
-//f
-// Confine edits to this section only.
+
+// Edit this section to choose the hardware design and set your payload ID etc
+
+// CHOOSE BOARD (comment out one of these only)
+#define HABDUINO
+// #define UAVANUT-LORA
+// #define HS_APRS_300
+// #define HS_RTTY_300      
 
 // RTTY settings
 #define RTTY_PAYLOAD_ID   "CHANGE_ME"          // Do not use spaces.
@@ -22,7 +30,7 @@
 #define RTTY_SHIFT        425                // Only used on boards where PWM is used for RTTY.
 
 // Power settings
-#define POWERSAVING	1		        // GPS power saving
+#define POWERSAVING	                      // Comment out to disable GPS power saving
 
 // LORA settings
 #define LORA_PAYLOAD_ID   "CHANGE_ME"            // Do not use spaces.
@@ -36,17 +44,49 @@
 #define LORA_BINARY          0
 
 // APRS settings
-#define APRS_CALLSIGN    "CHANGE"              // Comment out to disable APRS         
+#define APRS_CALLSIGN    "CHANGE"               // Max 6 characters
 #define APRS_SSID            11
+#define APRS_PATH_ALTITUDE   1500              // Below this altitude, ** in metres **, path will switch to WIDE1-1, WIDE2-1.  Above it will be or path or WIDE2-1 (see below)
+#define APRS_HIGH_USE_WIDE2    1                 // 1 means WIDE2-1 is used at altitude; 0 means no path is used
+
 #define APRS_TX_INTERVAL      1                 // APRS TX Interval in minutes
+#define APRS_PRE_EMPHASIS                      // Comment out to disable 3dB pre-emphasis.
+#define APRS_RANDOM          30                // Adjusts time to nexr transmission by up to +/1 this figure, in seconds.
+                                               // So for interval of 1 (minute), and random(30), each gap could be 30 - 90 seconds.
+                                               // Set to 0 to disable
+#define APRS_COMMENT     "www.daveakerman.com"   
+#define APRS_TELEM_INTERVAL  2                // How often to send telemetry packets.  Comment out to disable
 
+//------------------------------------------------------------------------------------------------------
 
-// CHOOSE BOARD (comment out one of these only)
-// #define HABDUINO
-// #define UAVANUT-LORA
+//------------------------------------------------------------------------------------------------------
 
+// HARDWARE DEFINITIONS
 
-// PRESET BOARD CONFIGURATIONS - THESE DEFINE THE ATTACHED HARDWARE
+// For unsupported hardware, add your own section here
+
+#ifdef HS_APRS_300
+  #define GPS_I2C
+  #define LED_STATUS         A2
+  #define LED_TX             A3
+  #define APRS_ENABLE         6
+  #define APRS_DATA           3         
+  
+  #define A0_MULTIPLIER      4.9
+  
+  #define WIREBUS             5
+#endif
+
+#ifdef HS_RTTY_300
+  #define GPS_I2C
+  #define LED_STATUS         A2
+  #define LED_TX             A3
+  #define RTTY_ENABLE         6
+  #define RTTY_DATA           3 
+  #define A0_MULTIPLIER      4.9
+  
+  #define WIREBUS             5
+#endif
 
 #ifdef UAVANUT-LORA
   #define GPS_I2C             1                // Comment out if using serial GPS
@@ -76,20 +116,25 @@
   #define MTX2
 #endif
 
-#ifdef SPECIAL
-  // GPS Section
-  #define  GPS_I2C  1                          // Comment out if using serial GPS
+#ifdef UAB
+  #define LED_OK              7
+  #define APRS_ENABLE         6
+  #define APRS_DATA           3         
+  #define GPS_SERIAL          Serial1
+  #define DEBUG_SERIAL        Serial
+#endif
 
-  // Radio section.
-  #define  LORA_NSS           5                // Comment out to disable LoRa code
-  #define  LORA_DIO0          3                
-  #define  LORA_DIO5          2
-  #define  LORA_ID            2
-  #define  LORA_SLOT         12
-  #define  LORA_REPEAT_SLOT  14
-  #define  LORA_CYCLETIME    15                  // Set to zero to send continuously
-  #define  LORA_MODE          2
-  #define  LORA_BINARY        1
+//------------------------------------------------------------------------------------------------------
+
+// Default serial port usage
+#ifndef GPS_SERIAL
+  #ifndef GPS_I2C
+    #define GPS_SERIAL Serial
+  #endif
+#endif
+
+#ifndef DEBUG_SERIAL
+  #define DEBUG_SERIAL Serial
 #endif
 
 #define EXTRA_FIELD_FORMAT    ",%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
@@ -125,15 +170,15 @@ struct TBinaryPacket
 	uint16_t	BiSeconds;
 	float		Latitude;
 	float		Longitude;
-	uint16_t	Altitude;
+	int32_t  	Altitude;
 };  //  __attribute__ ((packed));
 
 struct TGPS
 {
   int Hours, Minutes, Seconds;
-  long SecondsInDay;					// Time in seconds since midnight
+  unsigned long SecondsInDay;					// Time in seconds since midnight
   float Longitude, Latitude;
-  unsigned int Altitude;
+  long Altitude;
   unsigned int Satellites;
   int Speed;
   int Direction;
@@ -146,7 +191,8 @@ struct TGPS
   float Pressure;
   unsigned int BoardCurrent;
   unsigned int errorstatus;
-  byte navmode;
+  byte FlightMode;
+  byte PowerMode;
 } GPS;
 
 
@@ -156,22 +202,32 @@ int SentenceCounter=0;
 
 void setup()
 {
-  Serial.begin(9600);
-
-  Serial.println("");
-  Serial.print("FlexTrack Flight Computer, payload ID ");
-  Serial.println(RTTY_PAYLOAD_ID);
-  Serial.println("");
-
-#ifdef LED_WARN
-  pinMode(LED_WARN, OUTPUT);
-  digitalWrite(LED_WARN, 1);
-#endif
-
-#ifdef LED_OK
-  pinMode(LED_OK, OUTPUT);
-  digitalWrite(LED_OK, 0);
-#endif
+  // Serial port(s)
+  
+  #ifdef GPS_SERIAL
+    GPS_SERIAL.begin(9600);
+  #endif
+  
+  #ifdef DEBUG_SERIAL
+    DEBUG_SERIAL.begin(9600);
+    Serial.println("");
+    Serial.print("FlexTrack Flight Computer, payload ID(s)");
+    #ifdef RTTY_DATA
+      Serial.print(' ');
+      Serial.print(RTTY_PAYLOAD_ID);
+    #endif  
+    #ifdef LORA_NSS
+      Serial.print(' ');
+      Serial.print(LORA_PAYLOAD_ID);
+    #endif  
+    #ifdef APRS_DATA
+      Serial.print(' ');
+      Serial.print(APRS_CALLSIGN);
+    #endif  
+      
+    Serial.println("");
+    Serial.println("");
+  #endif
 
 #ifdef GPS_I2C
   Serial.println("I2C GPS");
@@ -184,7 +240,9 @@ void setup()
 #endif
 
 #ifdef RTTY_BAUD
-  Serial.println("RTTY telemetry enabled");
+  #ifdef RTTY_DATA
+    Serial.println("RTTY telemetry enabled");
+  #endif
 #endif
 
 #ifdef APRS_DATA 
@@ -193,6 +251,8 @@ void setup()
 
   Serial.print("Free memory = ");
   Serial.println(freeRam());
+
+  SetupLEDs();
   
   SetupGPS();
   
@@ -237,16 +297,12 @@ void loop()
 #endif
   
   CheckADC();
+  
+  CheckLEDs();
 
 #ifdef WIREBUS
   Checkds18b20();
 #endif
-  
-#ifdef POWERSAVING
-  CheckPowerSaving();
-#endif
-  
-  checkDynamicModel();  
 }
 
 

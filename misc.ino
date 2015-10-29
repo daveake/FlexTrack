@@ -12,7 +12,7 @@ int BuildSentence(char *TxLine, char *PayloadID)
 
     snprintf(TxLine,
             SENTENCE_LENGTH-6,
-            "$$%s,%d,%02d:%02d:%02d,%s,%s,%05.5u" EXTRA_FIELD_FORMAT,
+            "$$%s,%d,%02d:%02d:%02d,%s,%s,%05.5ld" EXTRA_FIELD_FORMAT,
             PayloadID,
             SentenceCounter,
 	    GPS.Hours, GPS.Minutes, GPS.Seconds,

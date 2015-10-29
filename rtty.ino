@@ -93,6 +93,7 @@ void CheckRTTY(void)
   {
     BuildSentence(TxLine, RTTY_PAYLOAD_ID);    
     Serial.print(TxLine);
+    Serial.print('\r');
     SendIndex = 0;
   }
 }
