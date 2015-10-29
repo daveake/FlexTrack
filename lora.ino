@@ -89,7 +89,6 @@
 
 // POWER AMPLIFIER CONFIG
 #define REG_PA_CONFIG               0x09
-// #define PA_MAX_BOOST                0x8F 
 #define PA_MAX_BOOST                0x8F    // 100mW (max 869.4 - 869.65)
 #define PA_LOW_BOOST                0x81
 #define PA_MED_BOOST                0x8A
@@ -208,14 +207,14 @@ void setMode(byte newMode)
   {
     case RF98_MODE_TX:
       writeRegister(REG_LNA, LNA_OFF_GAIN);  // TURN LNA OFF FOR TRANSMITT
-      writeRegister(REG_PA_CONFIG, PA_MAX_BOOST);  // PA_MAX_UK);
+      writeRegister(REG_PA_CONFIG, PA_MAX_UK);
       writeRegister(REG_OPMODE, newMode);
       currentMode = newMode; 
       
       break;
     case RF98_MODE_RX_CONTINUOUS:
       writeRegister(REG_PA_CONFIG, PA_OFF_BOOST);  // TURN PA OFF FOR RECIEVE??
-      writeRegister(REG_LNA, LNA_MAX_GAIN);  // LNA_MAX_GAIN);  // MAX GAIN FOR RECIEVE
+      writeRegister(REG_LNA, LNA_MAX_GAIN);  // MAX GAIN FOR RECIEVE
       writeRegister(REG_OPMODE, newMode);
       currentMode = newMode; 
       break;
