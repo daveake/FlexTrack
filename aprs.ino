@@ -251,7 +251,8 @@ ax25_base91enc(ptr, 2, Channel0Average);
         APRS_CALLSIGN, APRS_SSID,
         APRS_DEVID, 0,
         0, 0,
-        APRS_EQNS1 APRS_EQNS2 APRS_EQNS3 APRS_EQNS4,
+        //APRS_EQNS1 APRS_EQNS2 APRS_EQNS3 APRS_EQNS4,
+        APRS_EQNS1 APRS_EQNS2 APRS_EQNS3,
         s);
       aprs_mode = 0;
     }
