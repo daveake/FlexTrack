@@ -525,9 +525,9 @@ int receiveMessage(unsigned char *message, int MaxLength)
 
     // Clear all flags
     writeRegister(REG_IRQ_FLAGS, 0xFF); 
-  
-    return Bytes;
   }
+  
+  return Bytes;
 }
 
 

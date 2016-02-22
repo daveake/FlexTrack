@@ -173,7 +173,7 @@ void tx_aprs(void)
   ax25_base91enc(ptr, 2, GPS.Satellites);
   ptr += 2;
 #ifdef WIREBUS  
-  ax25_base91enc(ptr, 2, DS18B20_Temperatures[0]);
+  ax25_base91enc(ptr, 2, DS18B20_Temperatures[0] + 100);
   ptr += 2;
 #endif
 ax25_base91enc(ptr, 2, Channel0Average);  
@@ -202,19 +202,19 @@ ax25_base91enc(ptr, 2, Channel0Average);
 #ifdef APRS_TELEM_INTERVAL  
 #define APRS_PARM1    ":%-9s:PARM.Satellites"
 #define APRS_UNIT1    ":%-9s:UNIT.Sats"
-#define APRS_EQNS1    ":%-9s:EQNS.0,1,0,0,1,0"
+#define APRS_EQNS1    ":%-9s:EQNS.0,1,0"
 
  #ifdef WIREBUS
   #define APRS_PARM2   ",Temperature"
   #define APRS_UNIT2   ",deg.C"
-  #define APRS_EQNS2   ",0,1,0"
+  #define APRS_EQNS2   ",0,1,-100"
  #endif  
   
   #define APRS_PARM3   ",Battery"
   #define APRS_UNIT3   ",Volts"
   #define APRS_EQNS3   ",0,0.001,0"
   
-#define APRS_EQNS4     ",0,0,0"
+#define APRS_EQNS4     ",0,0,0,0,1,0"
 
   else if (aprs_mode >= 1)
   {
