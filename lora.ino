@@ -133,8 +133,9 @@ void setupRFM98(void)
   // initialize the pins
   #ifdef LORA_RESET
     pinMode(LORA_RESET, OUTPUT);
-    digitalWrite(LORA_RESET, HIGH);
+    digitalWrite(LORA_RESET, LOW);
     delay(10);          // Module needs this before it's ready
+    digitalWrite(LORA_RESET, HIGH);
   #endif
   pinMode(LORA_NSS, OUTPUT);
   pinMode(LORA_DIO0, INPUT);
