@@ -202,7 +202,8 @@ ax25_base91enc(ptr, 2, Channel0Average);
 #ifdef APRS_TELEM_INTERVAL  
 #define APRS_PARM1    ":%-9s:PARM.Satellites"
 #define APRS_UNIT1    ":%-9s:UNIT.Sats"
-#define APRS_EQNS1    ":%-9s:EQNS.0,1,0,0,1,0"
+//#define APRS_EQNS1    ":%-9s:EQNS.0,1,0,0,1,0"
+#define APRS_EQNS1    ":%-9s:EQNS.0,1,0"
 
  #ifdef WIREBUS
   #define APRS_PARM2   ",Temperature"
@@ -214,7 +215,7 @@ ax25_base91enc(ptr, 2, Channel0Average);
   #define APRS_UNIT3   ",Volts"
   #define APRS_EQNS3   ",0,0.001,0"
   
-#define APRS_EQNS4     ",0,0,0"
+//#define APRS_EQNS4     ",0,0,0"
 
   else if (aprs_mode >= 1)
   {
@@ -250,7 +251,8 @@ ax25_base91enc(ptr, 2, Channel0Average);
         APRS_CALLSIGN, APRS_SSID,
         APRS_DEVID, 0,
         0, 0,
-        APRS_EQNS1 APRS_EQNS2 APRS_EQNS3 APRS_EQNS4,
+        //APRS_EQNS1 APRS_EQNS2 APRS_EQNS3 APRS_EQNS4,
+        APRS_EQNS1 APRS_EQNS2 APRS_EQNS3,
         s);
       aprs_mode = 0;
     }
