@@ -7,10 +7,10 @@
 |                                                     |
 | Connections:                                        |
 |                                                     |
-|               Arduino  2 - RFM98W DIO5              |
-|               Arduino  3 - RFM98W DIO0              |
+|               Arduino  X - RFM98W DIO5              |
+|               Arduino  X - RFM98W DIO0              |
 |                                                     |
-|               Arduino 10 - RFM98W NSS               |
+|               Arduino  X  - RFM98W NSS              |
 |               Arduino 11 - RFM98W MOSI              |
 |               Arduino 12 - RFM98W MISO              |
 |               Arduino 13 - RFM98W CLK               |
@@ -89,7 +89,6 @@
 
 // POWER AMPLIFIER CONFIG
 #define REG_PA_CONFIG               0x09
-// #define PA_MAX_BOOST                0x8F 
 #define PA_MAX_BOOST                0x8F    // 100mW (max 869.4 - 869.65)
 #define PA_LOW_BOOST                0x81
 #define PA_MED_BOOST                0x8A
@@ -112,10 +111,11 @@ tLoRaMode LoRaMode;
 byte currentMode = 0x81;
 int TargetID;
 struct TBinaryPacket PacketToRepeat;
-byte SendRepeatedPacket, RepeatedPacketType;
+byte SendRepeatedPacket, RepeatedPacketType=0;
 int GroundCount;
 int AirCount;
 int BadCRCCount;
+unsigned char Sentence[SENTENCE_LENGTH];
 
 void SetupLoRa(void)
 {
@@ -131,6 +131,11 @@ void setupRFM98(void)
   int LowDataRateOptimize;
   
   // initialize the pins
+  #ifdef LORA_RESET
+    pinMode(LORA_RESET, OUTPUT);
+    digitalWrite(LORA_RESET, HIGH);
+    delay(10);          // Module needs this before it's ready
+  #endif
   pinMode(LORA_NSS, OUTPUT);
   pinMode(LORA_DIO0, INPUT);
   pinMode(LORA_DIO5, INPUT);
@@ -145,12 +150,22 @@ void setupRFM98(void)
   writeRegister(0x07, 0x9C);
   writeRegister(0x08, 0xCC);
 
-  // LoRa settings for repeater
-  ImplicitOrExplicit = EXPLICIT_MODE;
-  ErrorCoding = ERROR_CODING_4_8;
-  Bandwidth = BANDWIDTH_62K5;
-  SpreadingFactor = SPREADING_8;
-  LowDataRateOptimize = 0;		
+  // LoRa settings for various modes.  We support modes 2 (repeater mode), and 0 (normal slow telemetry mode).  Others, currently, are for SSDV
+  #if LORA_MODE == 2
+    ImplicitOrExplicit = EXPLICIT_MODE;
+    ErrorCoding = ERROR_CODING_4_8;
+    Bandwidth = BANDWIDTH_62K5;
+    SpreadingFactor = SPREADING_8;
+    LowDataRateOptimize = 0;		
+  #endif
+
+  #if LORA_MODE == 0  
+    ImplicitOrExplicit = EXPLICIT_MODE;
+    ErrorCoding = ERROR_CODING_4_8;
+    Bandwidth = BANDWIDTH_20K8;
+    SpreadingFactor = SPREADING_11;
+    LowDataRateOptimize = 0x08;		
+  #endif
 
   writeRegister(REG_MODEM_CONFIG, ImplicitOrExplicit | ErrorCoding | Bandwidth);
   writeRegister(REG_MODEM_CONFIG2, SpreadingFactor | CRC_ON);
@@ -192,14 +207,14 @@ void setMode(byte newMode)
   {
     case RF98_MODE_TX:
       writeRegister(REG_LNA, LNA_OFF_GAIN);  // TURN LNA OFF FOR TRANSMITT
-      writeRegister(REG_PA_CONFIG, PA_MAX_BOOST);  // PA_MAX_UK);
+      writeRegister(REG_PA_CONFIG, PA_MAX_UK);
       writeRegister(REG_OPMODE, newMode);
       currentMode = newMode; 
       
       break;
     case RF98_MODE_RX_CONTINUOUS:
       writeRegister(REG_PA_CONFIG, PA_OFF_BOOST);  // TURN PA OFF FOR RECIEVE??
-      writeRegister(REG_LNA, LNA_MAX_GAIN);  // LNA_MAX_GAIN);  // MAX GAIN FOR RECIEVE
+      writeRegister(REG_LNA, LNA_MAX_GAIN);  // MAX GAIN FOR RECIEVE
       writeRegister(REG_OPMODE, newMode);
       currentMode = newMode; 
       break;
@@ -272,22 +287,28 @@ void CheckLoRaRx(void)
   {
     if (digitalRead(LORA_DIO0))
     {
-      unsigned char Message[32];
+      // unsigned char Message[32];
       int Bytes;
 					
-      Bytes = receiveMessage(Message, sizeof(Message));
+      Bytes = receiveMessage(Sentence, sizeof(Sentence));
       Serial.print("Rx "); Serial.print(Bytes); Serial.println(" bytes");
+      RepeatedPacketType = 0;
       
-      Bytes = min(Bytes, sizeof(Message));
+      Bytes = min(Bytes, sizeof(Sentence));
 					
       if (Bytes > 0)
       {
-        if (Message[0] == '$')
+        if (Sentence[0] == '$')
         {
           // ASCII telemetry
-          Serial.println("Ignoring ASCII balloon message");
+          Serial.println("Rx ASCII");
+          if (memcmp(Sentence+2, LORA_PAYLOAD_ID, strlen(LORA_PAYLOAD_ID)) != 0)
+          {
+            RepeatedPacketType = 3;
+          }
         }
-        else if ((Message[0] & 0xC0) == 0xC0)
+        /*
+        else if ((Sentence[0] & 0xC0) == 0xC0)
         {
           // Binary downlink message
           char Payload[32];
@@ -304,8 +325,8 @@ void CheckLoRaRx(void)
             Serial.print("Balloon Binary Message from sender "); Serial.println(SourceID);
             
             // Replace the sender ID with ours
-            Message[0] = Message[0] & 0xC7 | (LORA_ID << 3);
-            memcpy(&PacketToRepeat, Message, sizeof(PacketToRepeat));
+            Sentence[0] = Sentenceage[0] & 0xC7 | (LORA_ID << 3);
+            memcpy(&PacketToRepeat, Sentence, sizeof(PacketToRepeat));
             RepeatedPacketType = 1;
 							
             AirCount++;
@@ -339,6 +360,7 @@ void CheckLoRaRx(void)
         {
           Serial.print("Unknown message "); Serial.println((int)Message[0]);
         }
+        */
       }
     }
   }
@@ -348,6 +370,8 @@ int TimeToSend(void)
 {
   int CycleSeconds;
 	
+  SendRepeatedPacket = 0;
+
   if (LORA_CYCLETIME == 0)
   {
     // Not using time to decide when we can send
@@ -372,10 +396,11 @@ int TimeToSend(void)
         return 1;
       }
 
-      if (RepeatedPacketType && (CycleSeconds == LORA_REPEAT_SLOT))
+      if (RepeatedPacketType && ((CycleSeconds == LORA_REPEAT_SLOT_1) || (CycleSeconds == LORA_REPEAT_SLOT_2)))
       {
         Serial.println("Time to repeat");
         SendRepeatedPacket = RepeatedPacketType;
+        RepeatedPacketType = 0;
         return 1;
       }
     }
@@ -500,9 +525,9 @@ int receiveMessage(unsigned char *message, int MaxLength)
 
     // Clear all flags
     writeRegister(REG_IRQ_FLAGS, 0xFF); 
-  
-    return Bytes;
   }
+  
+  return Bytes;
 }
 
 
@@ -552,13 +577,23 @@ void CheckLoRa(void)
       }
     }
   }
-  */
   
+  */
+
   CheckLoRaRx();
 		
   if (LoRaIsFree())
   {		
-    if (SendRepeatedPacket == 2)
+    Serial.println("LoRa is free");
+    if (SendRepeatedPacket == 3)
+    {
+      // Repeat ASCII sentence
+      SendLoRaPacket(Sentence, strlen((char *)Sentence)+1);
+				
+      RepeatedPacketType = 0;
+      SendRepeatedPacket = 0;
+    }
+    else if (SendRepeatedPacket == 2)
     {
       Serial.println("Repeating uplink packet");
 				
@@ -566,6 +601,7 @@ void CheckLoRa(void)
       SendLoRaPacket((unsigned char *)&PacketToRepeat, sizeof(PacketToRepeat));
 				
       RepeatedPacketType = 0;
+      SendRepeatedPacket = 0;
     }
     else if (SendRepeatedPacket == 1)
     {
@@ -575,11 +611,12 @@ void CheckLoRa(void)
       SendLoRaPacket((unsigned char *)&PacketToRepeat, sizeof(PacketToRepeat));
 				
       RepeatedPacketType = 0;
+      SendRepeatedPacket = 0;
     }
     else			
     {
       int PacketLength;
-      unsigned char Sentence[SENTENCE_LENGTH];
+      // unsigned char Sentence[SENTENCE_LENGTH];
 				
       if (LORA_BINARY)
       {
@@ -591,7 +628,7 @@ void CheckLoRa(void)
       else
       {
         // 0x80 | (LORA_ID << 3) | TargetID
-        PacketLength = BuildSentence((char *)Sentence);
+        PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
 	Serial.println("LoRa: ASCII Sentence");
       }
 							

@@ -1,4 +1,4 @@
-int BuildSentence(char *TxLine)
+int BuildSentence(char *TxLine, char *PayloadID)
 {
     int Count, i, j;
     unsigned char c;
@@ -12,8 +12,8 @@ int BuildSentence(char *TxLine)
 
     snprintf(TxLine,
             SENTENCE_LENGTH-6,
-            "$$%s,%d,%02d:%02d:%02d,%s,%s,%05.5u" EXTRA_FIELD_FORMAT,
-            PAYLOAD_ID,
+            "$$%s,%d,%02d:%02d:%02d,%s,%s,%05.5ld" EXTRA_FIELD_FORMAT,
+            PayloadID,
             SentenceCounter,
 	    GPS.Hours, GPS.Minutes, GPS.Seconds,
             LatitudeString,

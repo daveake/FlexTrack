@@ -8,6 +8,7 @@
 /* ========================================================================== */
 
 #ifdef RTTY_BAUD
+#ifdef RTTY_DATA
 
 // Our variables
 
@@ -41,7 +42,7 @@ void SetupRTTY(void)
   DataBits = 7;
   StopBits = 2;
 
-  #ifdef RTTY_SHIFT   
+  #ifdef RTTY_PWM   
     TCCR2B = TCCR2B & 0b11111000 | 1; // Sets fast PWM on pin 11  
   #endif
 }
@@ -90,15 +91,16 @@ void CheckRTTY(void)
 {
   if (SendIndex == -1)
   {
-    BuildSentence(TxLine);    
+    BuildSentence(TxLine, RTTY_PAYLOAD_ID);    
     Serial.print(TxLine);
+    Serial.print('\r');
     SendIndex = 0;
   }
 }
 
 void rtty_txbit(int bit)
 {
-  #ifdef RTTY_SHIFT  
+  #ifdef RTTY_PWM  
   // PWM control
   
     if (SettingFrequency)
@@ -190,3 +192,5 @@ void SetMTX2Frequency(float Frequency)
   #endif
 
 #endif
+#endif
+
