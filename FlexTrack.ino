@@ -37,7 +37,7 @@
 #define LORA_SLOT            0
 #define LORA_REPEAT_SLOT_1   0
 #define LORA_REPEAT_SLOT_2   0
-#define LORA_FREQUENCY       434.45
+#define LORA_FREQUENCY       434.450
 #define LORA_ID              1
 #define LORA_CYCLETIME       0                // Set to zero to send continuously
 #define LORA_MODE            0

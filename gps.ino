@@ -401,13 +401,6 @@ void CheckGPS(void)
     // delay(100);
   }
 
-  #ifdef LED_OK
-    digitalWrite(LED_OK, 0);
-  #endif
-  #ifdef LED_WARN
-    digitalWrite(LED_WARN, 0);
-  #endif
-  
   do
   {
     Bytes = GPSAvailable();
