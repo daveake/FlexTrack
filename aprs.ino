@@ -35,6 +35,22 @@
 
 #define APRS_DEVID "APEHAB"  
 
+#define APRS_PARM1    ":%-9s:PARM.Satellites"
+#define APRS_UNIT1    ":%-9s:UNIT.Sats"
+#define APRS_EQNS1    ":%-9s:EQNS.0,1,0"
+
+ #ifdef WIREBUS
+  #define APRS_PARM2   ",Temperature"
+  #define APRS_UNIT2   ",deg.C"
+  #define APRS_EQNS2   ",0,1,-100"
+ #endif  
+  
+  #define APRS_PARM3   ",Battery"
+  #define APRS_UNIT3   ",Volts"
+  #define APRS_EQNS3   ",0,0.001,0"
+  
+#define APRS_EQNS4     ",0,0,0,0,1,0"
+
 // Our variables
 
 unsigned long NextAPRS=0;
@@ -72,20 +88,29 @@ void CheckAPRS(void)
   {   
     unsigned long Seconds;
     
-//    Serial.println("Sending APRS Packet");
+    if (!MenuLevel)
+    {
+      Serial.println("Sending APRS Packet");
+    }
+    
     tx_aprs();
     
     if (aprs_mode == 0)
     {   
       // Normal transmission - wait another minute or whatever
-      Seconds = APRS_TX_INTERVAL * 60 + (rand() % APRS_RANDOM) - (APRS_RANDOM / 2);
+      Seconds = Settings.APRS_TxInterval * 60 + (rand() % Settings.APRS_Randomize) - (Settings.APRS_Randomize / 2);
     }
     else
     {
       Seconds = 0;
     }
-    Serial.print("Next packet in "); Serial.print(Seconds); Serial.println(" seconds");
-      
+    if (!MenuLevel)
+    {
+      Serial.print("Next packet in ");
+      Serial.print(Seconds);
+      Serial.println(" seconds");
+    }
+    
     NextAPRS = millis() + Seconds * 1000L;
   }
 }
@@ -155,10 +180,10 @@ void tx_aprs(void)
 
   aprs_alt = GPS.Altitude * 32808 / 10000;
   
-  if (GPS.Altitude > APRS_PATH_ALTITUDE)
+  if (GPS.Altitude > Settings.APRS_PathAltitude)
   {
     Wide1Path = 0;
-    Wide2Path = APRS_HIGH_USE_WIDE2;
+    Wide2Path = Settings.APRS_UsePathWhenHigh ? 1 : 0;
   }
   else
   {
@@ -182,52 +207,36 @@ ax25_base91enc(ptr, 2, Channel0Average);
   {
     /* Construct the compressed telemetry format */
     ax25_frame(
-      APRS_CALLSIGN, APRS_SSID,
+      Settings.APRS_Callsign, Settings.APRS_ID,
       APRS_DEVID, 0,
       Wide1Path, Wide2Path,
       "!/%s%sO   /A=%06ld|%s|%s",
       ax25_base91enc(slat, 4, aprs_lat),
       ax25_base91enc(slng, 4, aprs_lon),
-      aprs_alt, stlm, APRS_COMMENT);  // comment,APRS_CALLSIGN, ++APRSSentenceCounter);
+      aprs_alt, stlm, Settings.APRS_Comment);  // comment,APRS_CALLSIGN, ++APRSSentenceCounter);
   
-    #ifdef APRS_TELEM_INTERVAL
-      // Send the telemetry definitions every 10 packets
-      if(seq % (APRS_TELEM_INTERVAL) == 0)
+    if (Settings.APRS_TelemetryInterval > 0)
+    {
+      // Send the telemetry definitions every n packets
+      if(seq % (Settings.APRS_TelemetryInterval) == 0)
       {
         aprs_mode = 1;
       }
-    #endif
+    }
     seq++;
   }
-#ifdef APRS_TELEM_INTERVAL  
-#define APRS_PARM1    ":%-9s:PARM.Satellites"
-#define APRS_UNIT1    ":%-9s:UNIT.Sats"
-#define APRS_EQNS1    ":%-9s:EQNS.0,1,0"
-
- #ifdef WIREBUS
-  #define APRS_PARM2   ",Temperature"
-  #define APRS_UNIT2   ",deg.C"
-  #define APRS_EQNS2   ",0,1,-100"
- #endif  
-  
-  #define APRS_PARM3   ",Battery"
-  #define APRS_UNIT3   ",Volts"
-  #define APRS_EQNS3   ",0,0.001,0"
-  
-#define APRS_EQNS4     ",0,0,0,0,1,0"
-
   else if (aprs_mode >= 1)
   {
     char s[10];
 
     strncpy_P(s, PSTR(APRS_CALLSIGN), 7);
-    if(APRS_SSID) snprintf_P(s + strlen(s), 4, PSTR("-%i"), APRS_SSID);
+    if (Settings.APRS_ID) snprintf_P(s + strlen(s), 4, PSTR("-%i"), Settings.APRS_ID);
 
     if (aprs_mode == 1)
     {
       // Transmit telemetry definitions
       ax25_frame(
-        APRS_CALLSIGN, APRS_SSID,
+        Settings.APRS_Callsign, Settings.APRS_ID,
         APRS_DEVID, 0,
         0, 0,
         APRS_PARM1 APRS_PARM2 APRS_PARM3,
@@ -237,7 +246,7 @@ ax25_base91enc(ptr, 2, Channel0Average);
     else if (aprs_mode == 2)
     {
       ax25_frame(
-        APRS_CALLSIGN, APRS_SSID,
+        Settings.APRS_Callsign, Settings.APRS_ID,
         APRS_DEVID, 0,
         0, 0,
         APRS_UNIT1 APRS_UNIT2 APRS_UNIT3,
@@ -247,7 +256,7 @@ ax25_base91enc(ptr, 2, Channel0Average);
     else if (aprs_mode == 3)
     {
       ax25_frame(
-        APRS_CALLSIGN, APRS_SSID,
+        Settings.APRS_Callsign, Settings.APRS_ID,
         APRS_DEVID, 0,
         0, 0,
         APRS_EQNS1 APRS_EQNS2 APRS_EQNS3 APRS_EQNS4,
@@ -272,12 +281,10 @@ ISR(TIMER2_OVF_vect)
   
   /* Update the PWM output */
   value = pgm_read_byte(&_sine_table[(phase >> 7) & 0x1FF]);
-  #ifdef APRS_PRE_EMPHASIS
-  if (step == PHASE_DELTA_1200)
+  if (Settings.APRS_PreEmphasis && (step == PHASE_DELTA_1200))
   {
     value = (value >> 1) + 64;
   }
-  #endif
   OCR2B = value;
   phase += step;
 
@@ -375,4 +382,3 @@ static uint8_t *_ax25_callsign(uint8_t *s, char *callsign, char ssid)
   return(s);
 }
 
-#endif

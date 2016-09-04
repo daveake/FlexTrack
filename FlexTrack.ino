@@ -18,9 +18,9 @@
 // Edit this section to choose the hardware design and set your payload ID etc
 
 // CHOOSE BOARD (comment out one of these only)
-#define HABDUINO
+// #define HABDUINO
 // #define UAVANUT-LORA
-// #define HS_APRS_300
+#define HS_APRS_300
 // #define HS_RTTY_300      
 
 // RTTY settings
@@ -50,12 +50,12 @@
 #define APRS_HIGH_USE_WIDE2    1                 // 1 means WIDE2-1 is used at altitude; 0 means no path is used
 
 #define APRS_TX_INTERVAL      1                 // APRS TX Interval in minutes
-#define APRS_PRE_EMPHASIS                      // Comment out to disable 3dB pre-emphasis.
+#define APRS_PRE_EMPHASIS     1                 // Enables 3dB pre-emphasis.
 #define APRS_RANDOM          30                // Adjusts time to nexr transmission by up to +/1 this figure, in seconds.
                                                // So for interval of 1 (minute), and random(30), each gap could be 30 - 90 seconds.
                                                // Set to 0 to disable
-#define APRS_COMMENT     "www.daveakerman.com"   
-#define APRS_TELEM_INTERVAL  2                // How often to send telemetry packets.  Comment out to disable
+#define APRS_COMMENT     "FlexTrack"   
+#define APRS_TELEM_INTERVAL  2                // How often to send telemetry packets (telemetry incluided every APRS_TELEM_INTERVAL packets).  Zero out to disable
 
 //------------------------------------------------------------------------------------------------------
 
@@ -75,6 +75,8 @@
   #define A0_MULTIPLIER      4.9
   
   #define WIREBUS             5
+
+  #define ENABLE_MENU
 #endif
 
 #ifdef HS_RTTY_300
@@ -195,8 +197,26 @@ struct TGPS
   byte PowerMode;
 } GPS;
 
+// Tracker settings
+struct TSettings
+{
+  char APRS_Callsign[7];
+  int APRS_ID;
+  long APRS_PathAltitude;
+  int APRS_UsePathWhenHigh;
+  int APRS_TxInterval;
+  int APRS_PreEmphasis;
+  int APRS_Randomize;
+  char APRS_Comment[32];
+  int APRS_TelemetryInterval;
+} Settings;
 
 int SentenceCounter=0;
+
+int MenuLevel = 0;      // 0 = awaiting 2 ESCAPES to enter
+                        // 1 = awaiting second ESCAPE to enter
+                        // 2 = top level menu
+                        // 3 = module menu (e.g. APRS)
 
 //------------------------------------------------------------------------------------------------------
 
@@ -207,6 +227,8 @@ void setup()
   #ifdef GPS_SERIAL
     GPS_SERIAL.begin(9600);
   #endif
+
+  LoadDefaults();
   
   #ifdef DEBUG_SERIAL
     DEBUG_SERIAL.begin(9600);
@@ -275,6 +297,10 @@ void setup()
 #ifdef WIREBUS
   Setupds18b20();
 #endif
+
+#ifdef ENABLE_MENU
+  SetupMenu();
+#endif
 }
 
 
@@ -303,6 +329,10 @@ void loop()
 #ifdef WIREBUS
   Checkds18b20();
 #endif
+
+#ifdef ENABLE_MENU
+  CheckMenu();
+#endif
 }
 
 
@@ -312,3 +342,25 @@ int freeRam(void)
   int v; 
   return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
 }
+
+void LoadDefaults(void)
+{
+  // APRS
+
+  // Callsign
+  memset(Settings.APRS_Callsign, 0, sizeof(Settings.APRS_Callsign));
+  strncpy(Settings.APRS_Callsign, APRS_CALLSIGN, sizeof(Settings.APRS_Callsign));
+
+  // Numeric settings
+  Settings.APRS_ID = APRS_SSID;
+  Settings.APRS_PathAltitude = APRS_PATH_ALTITUDE;
+  Settings.APRS_UsePathWhenHigh = APRS_HIGH_USE_WIDE2;
+  Settings.APRS_TxInterval = APRS_TX_INTERVAL;
+  Settings.APRS_PreEmphasis = APRS_PRE_EMPHASIS;
+  Settings.APRS_Randomize = APRS_RANDOM;
+  Settings.APRS_TelemetryInterval = APRS_TELEM_INTERVAL;
+  
+  memset(Settings.APRS_Comment, 0, sizeof(Settings.APRS_Comment));
+  strncpy(Settings.APRS_Comment, APRS_COMMENT, sizeof(Settings.APRS_Comment));
+}
+

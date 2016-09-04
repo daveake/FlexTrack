@@ -50,11 +50,23 @@ void CheckLEDs(void)
     }
     else if ((GPS.Lock == 3) && (GPS.Satellites >= 4))
     {
+      // Flash OK/Status when we have a lock
       ControlLEDs(Flash, Flash, 0);
     }
     else
     {
-      ControlLEDs(1, 0, Flash);
+      #ifdef LED_WARN
+        // Flash Warn till we have a lock
+        ControlLEDs(1, 0, Flash);
+      #else
+        // Flash Status/Tx till we have a lock
+        #ifdef LED_STATUS
+          digitalWrite(LED_STATUS, Flash);
+        #endif
+        #ifdef LED_TX
+          digitalWrite(LED_TX, !Flash);
+        #endif
+      #endif
     }       
     
     NextLEDs = millis() + 500L;

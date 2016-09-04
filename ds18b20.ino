@@ -49,7 +49,14 @@ void Checkds18b20(void)
       for (i=0; i<SensorCount; i++)
       {
         DS18B20_Temperatures[i] = sensors.getTempCByIndex(i);
-        Serial.print("Temperature "); Serial.print(i); Serial.print(" = "); Serial.print(DS18B20_Temperatures[i]); Serial.println("degC");
+        if (!MenuLevel)
+        {
+          Serial.print("Temperature ");
+          Serial.print(i);
+          Serial.print(" = ");
+          Serial.print(DS18B20_Temperatures[i]);
+          Serial.println("degC");
+        }
       }
       CheckDS18B20s = millis() + 10000L;
     }

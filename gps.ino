@@ -75,7 +75,7 @@ void DisableNMEAProtocol(unsigned char Protocol)
   
   SendUBX(Disable, sizeof(Disable));
   
-  Serial.print("Disable NMEA "); Serial.println(Protocol);
+  if (!MenuLevel) Serial.print("Disable NMEA "); Serial.println(Protocol);
 }
 
 void SetFlightMode(byte NewMode)
@@ -194,9 +194,12 @@ void ProcessUBX_NAV_POSLLH(unsigned char *Buffer, int Length)
     GPS.Altitude = UBlox->HeightSeaLevel / 1000;
   }
 
-  Serial.print(GPS.Hours); Serial.print(":"); Serial.print(GPS.Minutes); Serial.print(":"); Serial.print(GPS.Seconds);Serial.print(" - ");
-  Serial.print(GPS.Latitude, 6); Serial.print(',');Serial.print(GPS.Longitude, 6);Serial.print(',');Serial.print(GPS.Altitude);Serial.print(',');
-  Serial.println(GPS.Satellites);
+  if (!MenuLevel)
+  {
+    Serial.print(GPS.Hours); Serial.print(":"); Serial.print(GPS.Minutes); Serial.print(":"); Serial.print(GPS.Seconds);Serial.print(" - ");
+    Serial.print(GPS.Latitude, 6); Serial.print(',');Serial.print(GPS.Longitude, 6);Serial.print(',');Serial.print(GPS.Altitude);Serial.print(',');
+    Serial.println(GPS.Satellites);
+  }
 }
 
 
@@ -367,7 +370,7 @@ void CheckGPS(void)
         if (RequiredFlightMode != GPS.FlightMode)
         {
           SetFlightMode(RequiredFlightMode);
-          Serial.println("Setting flight mode\n");
+          if (!MenuLevel) Serial.println("Setting flight mode\n");
         }
       break;
       
@@ -376,7 +379,7 @@ void CheckGPS(void)
         #ifdef POWERSAVING
           if (!GlonassMode)
           {
-            Serial.println("*** SetGNSSMode() ***");
+            if (!MenuLevel) Serial.println("*** SetGNSSMode() ***");
             SetGNSSMode();
           }
           else
@@ -386,7 +389,12 @@ void CheckGPS(void)
             
             if (RequiredPowerMode != GPS.PowerMode)
             {
-              Serial.print("*** SetPowerMode("); Serial.print(RequiredPowerMode); Serial.println(") ***");
+              if (!MenuLevel)
+              {
+                Serial.print("*** SetPowerMode(");
+                Serial.print(RequiredPowerMode);
+                Serial.println(") ***");
+              }
               SetPowerMode(RequiredPowerMode);
             }
           }
