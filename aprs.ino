@@ -72,7 +72,8 @@ void CheckAPRS(void)
   {   
     unsigned long Seconds;
     
-//    Serial.println("Sending APRS Packet");
+    Serial.println(F("Sending APRS Packet"));
+    
     tx_aprs();
     
     if (aprs_mode == 0)
@@ -84,7 +85,7 @@ void CheckAPRS(void)
     {
       Seconds = 0;
     }
-    Serial.print("Next packet in "); Serial.print(Seconds); Serial.println(" seconds");
+    Serial.print(F("Next packet in ")); Serial.print(Seconds); Serial.println(F(" seconds"));
       
     NextAPRS = millis() + Seconds * 1000L;
   }
@@ -97,8 +98,6 @@ void ax25_frame(char *scallsign, char sssid, char *dcallsign, char dssid, char t
   uint16_t x;
   va_list va;
 
-//  Serial.print("ax25_frame("); Serial.print(aprs_mode); Serial.println(")");
-  
   va_start(va, data);
   
   /* Write in the callsigns and paths */

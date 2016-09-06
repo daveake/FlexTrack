@@ -11,6 +11,8 @@
 |                                                                                                        |
 \*------------------------------------------------------------------------------------------------------*/
 
+#include <avr/pgmspace.h>
+
 //------------------------------------------------------------------------------------------------------
 
 // CONFIGURATION SECTION.
@@ -19,7 +21,7 @@
 
 // CHOOSE BOARD (comment out one of these only)
 #define HABDUINO
-// #define UAVANUT-LORA
+// #define UAVANUT_LORA
 // #define HS_APRS_300
 // #define HS_RTTY_300      
 
@@ -88,7 +90,7 @@
   #define WIREBUS             5
 #endif
 
-#ifdef UAVANUT-LORA
+#ifdef UAVANUT_LORA
   #define GPS_I2C             1                // Comment out if using serial GPS
   #define LORA_NSS           10                // Comment out to disable LoRa code
   #define LORA_RESET          7                // Comment out if not connected
@@ -104,15 +106,11 @@
   #define LED_OK             13
   #define GPS_ON              2
   #define RTTY_ENABLE         7
-  #define RTTY_DATA          11
-  #define RTTY_PWM            1
+  #define RTTY_DATA           4
   #define APRS_ENABLE         6
-  #define APRS_DATA           3                // Comment out to disable APRS
-  
+  #define APRS_DATA           3                // Comment out to disable APRS  
   #define A0_MULTIPLIER      4.9
-  
   #define WIREBUS             5
-  
   #define MTX2
 #endif
 
@@ -230,26 +228,26 @@ void setup()
   #endif
 
 #ifdef GPS_I2C
-  Serial.println("I2C GPS");
+  Serial.println(F("I2C GPS"));
 #else
-  Serial.println("Serial GPS");
+  Serial.println(F("Serial GPS"));
 #endif
 
 #ifdef LORA_NSS
-  Serial.println("LoRa telemetry enabled");
+  Serial.println(F("LoRa telemetry enabled"));
 #endif
 
 #ifdef RTTY_BAUD
   #ifdef RTTY_DATA
-    Serial.println("RTTY telemetry enabled");
+    Serial.println(F("RTTY telemetry enabled"));
   #endif
 #endif
 
 #ifdef APRS_DATA 
-  Serial.println("APRS telemetry enabled");
+  Serial.println(F("APRS telemetry enabled"));
 #endif
 
-  Serial.print("Free memory = ");
+  Serial.print(F("Free memory = "));
   Serial.println(freeRam());
 
   SetupLEDs();
@@ -261,13 +259,13 @@ void setup()
 #ifdef LORA_NSS
   SetupLoRa();
 #endif
-  
+
 #ifdef RTTY_BAUD
 #ifdef RTTY_DATA
   SetupRTTY();
 #endif
 #endif
-  
+
 #ifdef APRS_DATA
   SetupAPRS();
 #endif

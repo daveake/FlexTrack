@@ -625,7 +625,7 @@ void CheckLoRa(void)
     }
     else if (SendRepeatedPacket == 2)
     {
-      Serial.println("Repeating uplink packet");
+      Serial.println(F("Repeating uplink packet"));
 				
         // 0x80 | (LORA_ID << 3) | TargetID
       SendLoRaPacket((unsigned char *)&PacketToRepeat, sizeof(PacketToRepeat));
@@ -635,7 +635,7 @@ void CheckLoRa(void)
     }
     else if (SendRepeatedPacket == 1)
     {
-      Serial.println("Repeating balloon packet");
+      Serial.println(F("Repeating balloon packet"));
 				
         // 0x80 | (LORA_ID << 3) | TargetID
       SendLoRaPacket((unsigned char *)&PacketToRepeat, sizeof(PacketToRepeat));
@@ -653,13 +653,13 @@ void CheckLoRa(void)
         
         // 0x80 | (LORA_ID << 3) | TargetID
         PacketLength = BuildLoRaPositionPacket(Sentence);
-	Serial.println("LoRa: Binary packet");
+	      Serial.println(F("LoRa: Tx Binary packet"));
       }
       else
       {
         // 0x80 | (LORA_ID << 3) | TargetID
         PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
-	Serial.println("LoRa: ASCII Sentence");
+	      Serial.println(F("LoRa: Tx ASCII Sentence"));
       }
 							
       SendLoRaPacket(Sentence, PacketLength);		
