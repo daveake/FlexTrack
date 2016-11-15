@@ -39,14 +39,14 @@
 #define LORA_SLOT            0
 #define LORA_REPEAT_SLOT_1   0
 #define LORA_REPEAT_SLOT_2   0
-#define LORA_FREQUENCY       434.450
-#define LORA_ID              1
+#define LORA_FREQUENCY       434.600
+#define LORA_ID              0
 #define LORA_CYCLETIME       0                // Set to zero to send continuously
 #define LORA_MODE            0
 #define LORA_BINARY          0
 
 // APRS settings
-#define APRS_CALLSIGN    "CHANGE"               // Max 6 characters
+// #define APRS_CALLSIGN    "CHANGE"               // Max 6 characters
 #define APRS_SSID            11
 #define APRS_PATH_ALTITUDE   1500              // Below this altitude, ** in metres **, path will switch to WIDE1-1, WIDE2-1.  Above it will be or path or WIDE2-1 (see below)
 #define APRS_HIGH_USE_WIDE2    1                 // 1 means WIDE2-1 is used at altitude; 0 means no path is used
@@ -180,7 +180,6 @@ struct TGPS
   unsigned int Satellites;
   int Speed;
   int Direction;
-  byte GotTime;
   byte Lock;
   byte psm_status;
   float InternalTemperature;

@@ -112,10 +112,12 @@ byte currentMode = 0x81;
 int TargetID;
 struct TBinaryPacket PacketToRepeat;
 byte SendRepeatedPacket, RepeatedPacketType=0;
+int ImplicitOrExplicit;
 int GroundCount;
 int AirCount;
 int BadCRCCount;
 unsigned char Sentence[SENTENCE_LENGTH];
+unsigned long LastLoRaTX=0;
 
 void SetupLoRa(void)
 {
@@ -124,7 +126,6 @@ void SetupLoRa(void)
 
 void setupRFM98(void)
 {
-  int ImplicitOrExplicit;
   int ErrorCoding;
   int Bandwidth;
   int SpreadingFactor;
@@ -149,7 +150,7 @@ void setupRFM98(void)
   // Frequency
   setFrequency(LORA_FREQUENCY);
 
-  // LoRa settings for various modes.  We support modes 2 (repeater mode), and 0 (normal slow telemetry mode).  Others, currently, are for SSDV
+  // LoRa settings for various modes.  We support modes 2 (repeater mode), 1 (normally used for SSDV) and 0 (normal slow telemetry mode).
   #if LORA_MODE == 2
     ImplicitOrExplicit = EXPLICIT_MODE;
     ErrorCoding = ERROR_CODING_4_8;
@@ -407,9 +408,14 @@ int TimeToSend(void)
     // Not using time to decide when we can send
     return 1;
   }
-	
-  // Can't send till we have the time!
-  if (GPS.GotTime > 0)
+
+  if (millis() > (LastLoRaTX + LORA_CYCLETIME*1000+2000))
+  {
+    // Timed out
+    return 1;
+  }
+  
+  if (GPS.Satellites > 0)
   {
     static int LastCycleSeconds=-1;
 
@@ -481,16 +487,19 @@ void SendLoRaPacket(unsigned char *buffer, int Length)
 {
   int i;
   
+  LastLoRaTX = millis();
+  
   Serial.print("Sending "); Serial.print(Length);Serial.println(" bytes");
-  // Serial.println((char *)buffer);
   
   setMode(RF98_MODE_STANDBY);
 
   writeRegister(REG_DIO_MAPPING_1, 0x40);		// 01 00 00 00 maps DIO0 to TxDone
   writeRegister(REG_FIFO_TX_BASE_AD, 0x00);  // Update the address ptr to the current tx base address
   writeRegister(REG_FIFO_ADDR_PTR, 0x00); 
-  // writeRegister(REG_PAYLOAD_LENGTH, Length);
-  
+  if (ImplicitOrExplicit == EXPLICIT_MODE)
+  {
+    writeRegister(REG_PAYLOAD_LENGTH, Length);
+  }
   select();
   // tell SPI which address you want to write to
   SPI.transfer(REG_FIFO | 0x80);
