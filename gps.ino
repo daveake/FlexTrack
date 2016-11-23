@@ -148,57 +148,61 @@ void ProcessUBX_ACK(unsigned char *Buffer, int Length)
   LastCommand2 = 0;
 }
 
-void ProcessUBX_NAV_SOL(unsigned char *Buffer, int Length)
-{
-  if (Buffer[17] & 1)
-  {
-    GPS.Lock = Buffer[16];    /// Type of fix: 0=none, 1=deadreckoning; 2=2D, 3=3D, 4=GPS+deadreckoning, 5=time only, 6+ reserved
-    if (GPS.Lock >= 3)
-    {
-      HaveHadALock = 1;
-    }
-  }
-  else
-  {
-    GPS.Lock = 0;
-  }
-
-  GPS.Satellites = Buffer[53];
-  
-//  Serial.print("Lock="); Serial.print(GPS.Lock);Serial.print(", Sats=");Serial.println(GPS.Satellites);
-}
-
-void ProcessUBX_NAV_POSLLH(unsigned char *Buffer, int Length)
+void ProcessUBX_NAV_PVT(unsigned char *Buffer, int Length)
 {
   struct TUBlox
   {
-    unsigned long Time;
-    long Longitude;
-    long Latitude;
-    long HeightEllipsoid;
-    long HeightSeaLevel;
-    unsigned long HAccuracy;
-    unsigned long VAccuracy;
+    uint32_t GPSTime;
+    uint16_t Year;
+    uint8_t Month;
+    uint8_t Day;
+    uint8_t Hours;
+    uint8_t Minutes;
+    uint8_t Seconds;
+    uint8_t Valid;
+    uint32_t TimeAccuracy;
+    int32_t NanoSeconds;
+    uint8_t FixType;
+    uint8_t Flags;
+    uint8_t Reserved;
+    uint8_t Satellites;
+    int32_t Longitude;
+    int32_t Latitude;
+    int32_t HeightEllipsoid;
+    int32_t HeightSeaLevel;
+    uint32_t HAccuracy;
+    uint32_t VAccuracy;
   } *UBlox;
     
   UBlox = (struct TUBlox*)(Buffer+6);
 
-  GPS.SecondsInDay = (UBlox->Time / 1000) % 86400;      // Time of day in seconds = Time in week in ms / 1000, mod 86400
-  GPS.Hours = GPS.SecondsInDay / 3600;
-  GPS.Minutes = (GPS.SecondsInDay / 60) % 60;
-  GPS.Seconds = GPS.SecondsInDay % 60;  
-  if (HaveHadALock)
+  GPS.FixType = UBlox->FixType;
+  GPS.Satellites = UBlox->Satellites;
+  
+  if (UBlox->FixType > 0)
   {
-    GPS.Longitude = (float)(UBlox->Longitude) / 10000000;
-    GPS.Latitude = (float)(UBlox->Latitude) / 10000000;
-    GPS.Altitude = UBlox->HeightSeaLevel / 1000;
+    GPS.SecondsInDay = (UBlox->GPSTime / 1000) % 86400;      // Time of day in seconds = Time in week in ms / 1000, mod 86400
+    GPS.Hours = UBlox->Hours; // GPS.SecondsInDay / 3600;
+    GPS.Minutes = UBlox->Minutes; // (GPS.SecondsInDay / 60) % 60;
+    GPS.Seconds = UBlox->Seconds; // GPS.SecondsInDay % 60;  
+    
+    if ((UBlox->FixType >= 1) && (UBlox->FixType <= 4))
+    {
+      GPS.Longitude = (float)(UBlox->Longitude) / 10000000;
+      GPS.Latitude = (float)(UBlox->Latitude) / 10000000;
+      
+      if ((UBlox->FixType >= 3) && (UBlox->FixType <= 4))
+      {
+        GPS.Altitude = UBlox->HeightSeaLevel / 1000;
+      }
+    }
   }
-
+//  Serial.print(UBlox->Valid); Serial.print(": "); Serial.print(GPS.SecondsInDay - ((unsigned long)GPS.Hours*3600L + (unsigned long)GPS.Minutes*60L + (unsigned long)GPS.Seconds)); Serial.print(" ... ");
+//  Serial.print(GPS.SecondsInDay); Serial.print(" - ");
   Serial.print(GPS.Hours); Serial.print(":"); Serial.print(GPS.Minutes); Serial.print(":"); Serial.print(GPS.Seconds);Serial.print(" - ");
   Serial.print(GPS.Latitude, 6); Serial.print(',');Serial.print(GPS.Longitude, 6);Serial.print(',');Serial.print(GPS.Altitude);Serial.print(',');
   Serial.println(GPS.Satellites);
 }
-
 
 void ProcessUBX(unsigned char *Buffer, int Length)
 {
@@ -209,13 +213,9 @@ void ProcessUBX(unsigned char *Buffer, int Length)
   {
     ProcessUBX_ACK(Buffer, Length);
   }
-  else if ((Buffer[2] == 1) && (Buffer[3] == 6))
+  else if ((Buffer[2] == 1) && (Buffer[3] == 7))
   {
-    ProcessUBX_NAV_SOL(Buffer, Length);
-  }
-  else if ((Buffer[2] == 1) && (Buffer[3] == 2))
-  {
-    ProcessUBX_NAV_POSLLH(Buffer, Length);
+    ProcessUBX_NAV_PVT(Buffer, Length);
   }
 }
 
@@ -314,93 +314,23 @@ void PollGPSTime(void)
   SendUBX(request, sizeof(request));
 }
 
-void PollGPSLock(void)
-{
-  uint8_t request[] = {0xB5, 0x62, 0x01, 0x06, 0x00, 0x00, 0x07, 0x16};
-  SendUBX(request, sizeof(request));
-}
-
 void PollGPSPosition(void)
 {
-  uint8_t request[] = {0xB5, 0x62, 0x01, 0x02, 0x00, 0x00, 0x03, 0x0A};
+  // uint8_t request[] = {0xB5, 0x62, 0x01, 0x02, 0x00, 0x00, 0x03, 0x0A}; LLH
+  uint8_t request[] = {0xB5, 0x62, 0x01, 0x07, 0x00, 0x00, 0x08, 0x19};
+  
   SendUBX(request, sizeof(request));
 }
   
 void CheckGPS(void)
 {
   static unsigned long PollTime=0;
-  static unsigned char Line[80];
+  static unsigned char Line[128];
   static int Length=0;
   static int UBXLength=0;
   static unsigned int PollMode=0;
   unsigned char Character, Bytes, i;
   
-  if (millis() >= PollTime)
-  {
-    if (PollTime == 0)
-    {
-      PollTime = millis();
-    }
-    else
-    {
-      PollTime += 200;
-    }
-    
-    Length = 0;
-    
-    switch (PollMode)
-    {
-      case 0:
-        // Poll for lock/sats
-        PollGPSLock();
-      break;
-        
-      case 1:
-        // Poll for position
-        PollGPSPosition();
-      break;
-      
-      case 2:
-        // Flight/ped mode
-        
-        RequiredFlightMode = (GPS.Altitude > 1000) ? 6 : 3;    // 6 is airborne <1g mode; 3=Pedestrian mode
-        if (RequiredFlightMode != GPS.FlightMode)
-        {
-          SetFlightMode(RequiredFlightMode);
-          Serial.println("Setting flight mode\n");
-        }
-      break;
-      
-      case 3:
-        // Power saving
-        #ifdef POWERSAVING
-          if (!GlonassMode)
-          {
-            Serial.println("*** SetGNSSMode() ***");
-            SetGNSSMode();
-          }
-          else
-          {           
-            // All the following need to be true for us to try power saving mode
-            RequiredPowerMode = (GPS.Lock==3) && (GPS.Satellites>=5);
-            
-            if (RequiredPowerMode != GPS.PowerMode)
-            {
-              Serial.print("*** SetPowerMode("); Serial.print(RequiredPowerMode); Serial.println(") ***");
-              SetPowerMode(RequiredPowerMode);
-            }
-          }
-        #endif
-      break;
-    }
-    
-    if (++PollMode >= 5)
-    {
-      PollMode = 0;
-    }
-    // delay(100);
-  }
-
   do
   {
     Bytes = GPSAvailable();
@@ -474,5 +404,66 @@ void CheckGPS(void)
       }
     }
   } while (Bytes > 0);
+
+  if (millis() >= PollTime)
+  {
+    if (PollTime == 0)
+    {
+      PollTime = millis();
+    }
+    else
+    {
+      // PollTime += 200;
+      PollTime = millis() + 200;
+    }
+    
+    Length = 0;
+    
+    switch (PollMode)
+    {
+      case 0:
+        // Poll for position
+        PollGPSPosition();
+      break;
+      
+      case 1:
+        // Flight/ped mode
+        
+        RequiredFlightMode = (GPS.Altitude > 1000) ? 6 : 3;    // 6 is airborne <1g mode; 3=Pedestrian mode
+        if (RequiredFlightMode != GPS.FlightMode)
+        {
+          SetFlightMode(RequiredFlightMode);
+          Serial.println("Setting flight mode\n");
+        }
+      break;
+      
+      case 2:
+        // Power saving
+        #ifdef POWERSAVING
+          if (!GlonassMode)
+          {
+            Serial.println("*** SetGNSSMode() ***");
+            SetGNSSMode();
+          }
+          else
+          {           
+            // All the following need to be true for us to try power saving mode
+            RequiredPowerMode = (GPS.FixType==3) && (GPS.Satellites>=5);
+            
+            if (RequiredPowerMode != GPS.PowerMode)
+            {
+              Serial.print("*** SetPowerMode("); Serial.print(RequiredPowerMode); Serial.println(") ***");
+              SetPowerMode(RequiredPowerMode);
+            }
+          }
+        #endif
+      break;
+    }
+    
+    if (++PollMode >= 3)
+    {
+      PollMode = 0;
+    }
+  }
 }
 

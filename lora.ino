@@ -118,6 +118,7 @@ int AirCount;
 int BadCRCCount;
 unsigned char Sentence[SENTENCE_LENGTH];
 unsigned long LastLoRaTX=0;
+unsigned long TimeToSendIfNoGPS=0;
 
 void SetupLoRa(void)
 {
@@ -337,6 +338,22 @@ void CheckLoRaRx(void)
           {
             RepeatedPacketType = 3;
           }
+
+          // Get timing from this message
+          if ((LORA_TIME_INDEX > 0) && (LORA_TIME_MUTLIPLER > 0))
+          {
+            unsigned char Slot;
+            long Offset;
+
+            Slot = (Sentence[LORA_TIME_INDEX+2] - '0') * LORA_TIME_MUTLIPLER + LORA_TIME_OFFSET;
+            Offset = (LORA_SLOT - Slot) * 1000L - LORA_PACKET_TIME;
+            if (Offset < 0) Offset += LORA_CYCLETIME * 1000L;
+
+            Serial.print("Rx Slot = "); Serial.println(Slot);
+            Serial.print(" Offset = "); Serial.println(Offset);
+
+            TimeToSendIfNoGPS = millis() + Offset;
+          }
         }
         /*
         else if ((Sentence[0] & 0xC0) == 0xC0)
@@ -409,9 +426,10 @@ int TimeToSend(void)
     return 1;
   }
 
-  if (millis() > (LastLoRaTX + LORA_CYCLETIME*1000+2000))
+  if ((millis() > (LastLoRaTX + LORA_CYCLETIME*1000+2000)) && (TimeToSendIfNoGPS == 0))
   {
     // Timed out
+    Serial.println("Using Timeout");
     return 1;
   }
   
@@ -420,7 +438,7 @@ int TimeToSend(void)
     static int LastCycleSeconds=-1;
 
     // Can't Tx twice at the same time
-    CycleSeconds = GPS.SecondsInDay % LORA_CYCLETIME;
+    CycleSeconds = (GPS.SecondsInDay+LORA_CYCLETIME-17) % LORA_CYCLETIME;   // Could just use GPS time, but it's nice to see the slot agree with UTC
     
     if (CycleSeconds != LastCycleSeconds)
     {
@@ -428,6 +446,7 @@ int TimeToSend(void)
       
       if (CycleSeconds == LORA_SLOT)
       {
+        Serial.println("Using GPS Timing");
         SendRepeatedPacket = 0;
         return 1;
       }
@@ -440,6 +459,12 @@ int TimeToSend(void)
         return 1;
       }
     }
+  }
+  else if ((TimeToSendIfNoGPS > 0) && (millis() >= TimeToSendIfNoGPS))
+  {
+    Serial.println("Using LoRa Timing");
+    SendRepeatedPacket = 0;
+    return 1;
   }
     
   return 0;
@@ -488,6 +513,7 @@ void SendLoRaPacket(unsigned char *buffer, int Length)
   int i;
   
   LastLoRaTX = millis();
+  TimeToSendIfNoGPS = 0;
   
   Serial.print("Sending "); Serial.print(Length);Serial.println(" bytes");
   
@@ -666,7 +692,6 @@ void CheckLoRa(void)
       }
       else
       {
-        // 0x80 | (LORA_ID << 3) | TargetID
         PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
 	      Serial.println(F("LoRa: Tx ASCII Sentence"));
       }
