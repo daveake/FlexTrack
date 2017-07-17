@@ -48,7 +48,7 @@ void CheckLEDs(void)
       // All off
       ControlLEDs(0,0,0);
     }
-    else if ((GPS.Lock == 3) && (GPS.Satellites >= 4))
+    else if ((GPS.FixType == 3) && (GPS.Satellites >= 4))
     {
       ControlLEDs(Flash, Flash, 0);
     }
