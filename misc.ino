@@ -1,4 +1,4 @@
-int BuildSentence(char *TxLine, char *PayloadID)
+int BuildSentence(char *TxLine, const char *PayloadID)
 {
     int Count, i, j;
     unsigned char c;

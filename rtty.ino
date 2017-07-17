@@ -13,8 +13,8 @@
 // Our variables
 
 char TxLine[SENTENCE_LENGTH];
-int SendIndex = -1;
-int SendBit = 0;
+volatile int SendIndex = -1;
+volatile int SendBit = 0;
 int StopBits, DataBits;
 int Timer2Count;
 int RTTY_Counter;
@@ -100,24 +100,26 @@ void CheckRTTY(void)
 
 void rtty_txbit(int bit)
 {
-  #ifdef RTTY_PWM  
-  // PWM control
-  
-    if (SettingFrequency)
-    {
-      digitalWrite(RTTY_ENABLE, bit);
-    }
-    else if (bit)
-    {
-      analogWrite(RTTY_DATA, (RTTY_SHIFT *1.8) / 16); // High
-    }
-    else
-    {
-      analogWrite(RTTY_DATA, 0); // Low
-    }
-  #else
-    digitalWrite(RTTY_DATA, bit);
-  #endif
+  if (SettingFrequency)
+  {
+    digitalWrite(RTTY_ENABLE, bit);
+  }
+  else
+  {
+    #ifdef RTTY_PWM  
+    // PWM control
+      if (bit)
+      {
+        analogWrite(RTTY_DATA, (RTTY_SHIFT *1.8) / 16); // High
+      }
+      else
+      {
+        analogWrite(RTTY_DATA, 0); // Low
+      }
+    #else
+      digitalWrite(RTTY_DATA, bit);
+    #endif
+  }
 }
 
 ISR(TIMER1_COMPA_vect)

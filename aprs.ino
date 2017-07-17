@@ -91,7 +91,7 @@ void CheckAPRS(void)
   }
 }
 
-void ax25_frame(char *scallsign, char sssid, char *dcallsign, char dssid, char ttl1, char ttl2, char *data, ...)
+void ax25_frame(const char *scallsign, const char sssid, const char *dcallsign, const char dssid, const char ttl1, const char ttl2, const char *data, ...)
 {
   static uint8_t frame[100];
   uint8_t *s;
@@ -362,7 +362,7 @@ char *ax25_base91enc(char *s, uint8_t n, uint32_t v)
   return(s);
 }
 
-static uint8_t *_ax25_callsign(uint8_t *s, char *callsign, char ssid)
+static uint8_t *_ax25_callsign(uint8_t *s, const char *callsign, const char ssid)
 {
   char i;
   for(i = 0; i < 6; i++)
