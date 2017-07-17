@@ -32,7 +32,7 @@
 #define RTTY_SHIFT        425                // Only used on boards where PWM is used for RTTY.
 
 // Power settings
-// #define POWERSAVING	                      // Comment out to disable GPS power saving
+#define POWERSAVING	                      // Comment out to disable GPS power saving
 
 // LORA settings
 #define LORA_PAYLOAD_ID   "OO5"            // Do not use spaces.
@@ -92,7 +92,6 @@
   #define RTTY_ENABLE         6
   #define RTTY_DATA           3 
   #define A0_MULTIPLIER      4.9
-  
   #define WIREBUS             5
 #endif
 
@@ -108,15 +107,15 @@
 #endif
 
 #ifdef HABDUINO
-  #define LED_WARN           12
-  #define LED_OK             13
-  #define GPS_ON              2
-  #define RTTY_ENABLE         7
-  #define RTTY_DATA           4
-  #define APRS_ENABLE         6
-  #define APRS_DATA           3                // Comment out to disable APRS  
+  #define LED_WARN           9
+  #define LED_OK             8
+  #define GPS_ON             2
+  #define RTTY_ENABLE        7
+  #define RTTY_DATA          4
+  #define APRS_ENABLE        6
+  #define APRS_DATA          3                // Comment out to disable APRS  
   #define A0_MULTIPLIER      4.9
-  #define WIREBUS             5
+  #define WIREBUS            5
   #define MTX2
 #endif
 
@@ -141,11 +140,11 @@
   #define DEBUG_SERIAL Serial
 #endif
 
-#define EXTRA_FIELD_FORMAT    ",%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
-#define EXTRA_FIELD_LIST           ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites
+//#define EXTRA_FIELD_FORMAT    ",%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
+//#define EXTRA_FIELD_LIST           ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites
 
-// #define EXTRA_FIELD_FORMAT    ""   // ",%d,%d,%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
-// #define EXTRA_FIELD_LIST           // ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites, DS18B20_Temperatures[0], Channel0Average
+#define EXTRA_FIELD_FORMAT      ",%d,%d,%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
+#define EXTRA_FIELD_LIST            ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites, DS18B20_Temperatures[0], Channel0Average
                                                                 // List of variables/expressions for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
 #define SENTENCE_LENGTH      100                  // This is more than sufficient for the standard sentence.  Extend if needed; shorten if you are tight on memory.
 
