@@ -59,7 +59,7 @@
 
 #define APRS_TX_INTERVAL      1                 // APRS TX Interval in minutes
 #define APRS_PRE_EMPHASIS                      // Comment out to disable 3dB pre-emphasis.
-#define APRS_RANDOM          30                // Adjusts time to nexr transmission by up to +/1 this figure, in seconds.
+#define APRS_RANDOM          30                // Adjusts time to next transmission by up to +/1 this figure, in seconds.
                                                // So for interval of 1 (minute), and random(30), each gap could be 30 - 90 seconds.
                                                // Set to 0 to disable
 #define APRS_COMMENT     "www.daveakerman.com"   
