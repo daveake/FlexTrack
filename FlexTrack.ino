@@ -35,8 +35,8 @@
 #define POWERSAVING	                      // Comment out to disable GPS power saving
 
 // LORA settings
-#define LORA_PAYLOAD_ID   "OO5"            // Do not use spaces.
-#define LORA_SLOT            11
+#define LORA_PAYLOAD_ID   "CHANGEME"            // Do not use spaces.
+#define LORA_SLOT            -1
 #define LORA_REPEAT_SLOT_1   -1
 #define LORA_REPEAT_SLOT_2   -1
 
@@ -47,9 +47,12 @@
 #define LORA_FREQUENCY       434.45
 
 #define LORA_ID              0
-#define LORA_CYCLETIME       20                // Set to zero to send continuously
-#define LORA_MODE            2
+#define LORA_CYCLETIME       0                // Set to zero to send continuously
+#define LORA_MODE            1
 #define LORA_BINARY          0
+#define LORA_CALL_FREQ 		433.650
+#define LORA_CALL_MODE		 5				
+#define LORA_CALL_COUNT		10				// Set to zero to disable calling mode
 
 // APRS settings
 #define APRS_CALLSIGN    "CHANGE"               // Max 6 characters
@@ -140,8 +143,8 @@
   #define DEBUG_SERIAL Serial
 #endif
 
-//#define EXTRA_FIELD_FORMAT    ",%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
-//#define EXTRA_FIELD_LIST           ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites
+// #define EXTRA_FIELD_FORMAT    ",%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
+// #define EXTRA_FIELD_LIST           ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites
 
 #define EXTRA_FIELD_FORMAT      ",%d,%d,%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
 #define EXTRA_FIELD_LIST            ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites, DS18B20_Temperatures[0], Channel0Average

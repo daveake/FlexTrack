@@ -57,8 +57,25 @@ int BuildSentence(char *TxLine, const char *PayloadID)
     TxLine[Count++] = Hex((CRC >> 8) & 15);
     TxLine[Count++] = Hex((CRC >> 4) & 15);
     TxLine[Count++] = Hex(CRC & 15);
-	TxLine[Count++] = '\n';  
-	TxLine[Count++] = '\0';
+  	TxLine[Count++] = '\n';  
+	  TxLine[Count++] = '\0';
 	
 	return strlen(TxLine) + 1;
+}
+
+int BuildLoRaCall(unsigned char *TxLine)
+{
+	char Frequency[8];
+	
+	dtostrf(LORA_FREQUENCY, 7, 3, Frequency);
+
+  sprintf((char *)TxLine, "^^%s,%s,%d,%d,%d,%d,%d",
+    			        LORA_PAYLOAD_ID, Frequency,
+        			    LORA_MODE == 1 ? 1 : 0, 
+        			    LORA_MODE == 1 ? ERROR_CODING_4_5 : ERROR_CODING_4_8,
+        			    LORA_MODE == 2 ? BANDWIDTH_62K5 : BANDWIDTH_20K8,
+        			    LORA_MODE == 2 ? SPREADING_8 : (LORA_MODE == 1 ? SPREADING_6 : SPREADING_11),
+        			    LORA_MODE == 0 ? 0x08 : 0);
+			
+	return strlen((char *)TxLine) + 1;
 }

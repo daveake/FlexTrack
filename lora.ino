@@ -119,13 +119,14 @@ int BadCRCCount;
 unsigned char Sentence[SENTENCE_LENGTH];
 unsigned long LastLoRaTX=0;
 unsigned long TimeToSendIfNoGPS=0;
+int CallingCount=0;
 
 void SetupLoRa(void)
 {
-  setupRFM98();
+  setupRFM98(LORA_FREQUENCY, LORA_MODE);
 }
 
-void setupRFM98(void)
+void setupRFM98(double Frequency, int Mode)
 {
   int ErrorCoding;
   int Bandwidth;
@@ -149,32 +150,43 @@ void setupRFM98(void)
   setLoRaMode();
 
   // Frequency
-  setFrequency(LORA_FREQUENCY);
+  setFrequency(Frequency);
 
   // LoRa settings for various modes.  We support modes 2 (repeater mode), 1 (normally used for SSDV) and 0 (normal slow telemetry mode).
-  #if LORA_MODE == 2
+  
+  if (Mode == 5)
+  {
+    ImplicitOrExplicit = EXPLICIT_MODE;
+    ErrorCoding = ERROR_CODING_4_8;
+    Bandwidth = BANDWIDTH_41K7;
+    SpreadingFactor = SPREADING_11;
+    LowDataRateOptimize = 0;		
+  }
+  else if (Mode == 2)
+  {
     ImplicitOrExplicit = EXPLICIT_MODE;
     ErrorCoding = ERROR_CODING_4_8;
     Bandwidth = BANDWIDTH_62K5;
     SpreadingFactor = SPREADING_8;
     LowDataRateOptimize = 0;		
-  #endif
-
-  #if LORA_MODE == 1
+  }
+  else if (Mode == 1)
+  {
     ImplicitOrExplicit = IMPLICIT_MODE;
     ErrorCoding = ERROR_CODING_4_5;
     Bandwidth = BANDWIDTH_20K8;
     SpreadingFactor = SPREADING_6;
     LowDataRateOptimize = 0;    
-  #endif
-
-  #if LORA_MODE == 0  
+  }
+  else if (Mode == 0)
+  {
     ImplicitOrExplicit = EXPLICIT_MODE;
     ErrorCoding = ERROR_CODING_4_8;
     Bandwidth = BANDWIDTH_20K8;
     SpreadingFactor = SPREADING_11;
     LowDataRateOptimize = 0x08;		
-  #endif
+  }
+  
 
   PayloadLength = ImplicitOrExplicit == IMPLICIT_MODE ? 255 : 0;
 
@@ -653,6 +665,7 @@ void CheckLoRa(void)
     if (SendRepeatedPacket == 3)
     {
       // Repeat ASCII sentence
+      Sentence[0] = '%';
       SendLoRaPacket(Sentence, strlen((char *)Sentence)+1);
 				
       RepeatedPacketType = 0;
@@ -681,19 +694,32 @@ void CheckLoRa(void)
     else			
     {
       int PacketLength;
-      // unsigned char Sentence[SENTENCE_LENGTH];
 				
-      if (LORA_BINARY)
-      {
-        
-        // 0x80 | (LORA_ID << 3) | TargetID
-        PacketLength = BuildLoRaPositionPacket(Sentence);
-	      Serial.println(F("LoRa: Tx Binary packet"));
-      }
+      if ((LORA_CALL_COUNT > 0) && (++CallingCount >= LORA_CALL_COUNT))
+	    {
+		    CallingCount = 0;
+		    setupRFM98(LORA_CALL_FREQ, LORA_CALL_MODE);
+        PacketLength = BuildLoRaCall((char *)Sentence);
+		    Serial.println(F("LoRa: Calling Mode"));
+	    }
       else
-      {
-        PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
-	      Serial.println(F("LoRa: Tx ASCII Sentence"));
+	    {
+		    if ((LORA_CALL_COUNT > 0) && (CallingCount == 1))
+		    {
+			    setupRFM98(LORA_FREQUENCY, LORA_MODE);
+		    }
+		
+	      if (LORA_BINARY)
+        {
+          // 0x80 | (LORA_ID << 3) | TargetID
+          PacketLength = BuildLoRaPositionPacket(Sentence);
+		      Serial.println(F("LoRa: Tx Binary packet"));
+        }
+        else
+        {
+          PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
+	        Serial.println(F("LoRa: Tx ASCII Sentence"));
+		    }
       }
 							
       SendLoRaPacket(Sentence, PacketLength);		
@@ -702,4 +728,3 @@ void CheckLoRa(void)
 }
 
 #endif
-
