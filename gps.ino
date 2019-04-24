@@ -75,7 +75,7 @@ void DisableNMEAProtocol(unsigned char Protocol)
   
   SendUBX(Disable, sizeof(Disable));
   
-  Serial.print("Disable NMEA "); Serial.println(Protocol);
+  // Serial.print("Disable NMEA "); Serial.println(Protocol);
 }
 
 void SetFlightMode(byte NewMode)
@@ -140,10 +140,6 @@ void ProcessUBX_ACK(unsigned char *Buffer, int Length)
   {
     GPS.PowerMode = RequiredPowerMode;
   }
-//  else
-//  {
-//    Serial.print("ACK ("); Serial.print(LastCommand1); Serial.print(","); Serial.print(LastCommand2); Serial.println(")");
-//  }
   LastCommand1 = 0;
   LastCommand2 = 0;
 }
@@ -197,18 +193,13 @@ void ProcessUBX_NAV_PVT(unsigned char *Buffer, int Length)
       }
     }
   }
-//  Serial.print(UBlox->Valid); Serial.print(": "); Serial.print(GPS.SecondsInDay - ((unsigned long)GPS.Hours*3600L + (unsigned long)GPS.Minutes*60L + (unsigned long)GPS.Seconds)); Serial.print(" ... ");
-//  Serial.print(GPS.SecondsInDay); Serial.print(" - ");
   Serial.print(GPS.Hours); Serial.print(":"); Serial.print(GPS.Minutes); Serial.print(":"); Serial.print(GPS.Seconds);Serial.print(" - ");
   Serial.print(GPS.Latitude, 6); Serial.print(',');Serial.print(GPS.Longitude, 6);Serial.print(',');Serial.print(GPS.Altitude);Serial.print(',');
   Serial.println(GPS.Satellites);
 }
 
 void ProcessUBX(unsigned char *Buffer, int Length)
-{
-//  Serial.print("UBX "); Serial.print(Buffer[2], HEX);
-//  Serial.print(" "); Serial.println(Buffer[3], HEX);
-  
+{ 
   if ((Buffer[2] == 0x05) && (Buffer[3] == 0x01))
   {
     ProcessUBX_ACK(Buffer, Length);
@@ -277,11 +268,6 @@ int GPSAvailable(void)
   
   Bytes = FD * 256 + FE;
 
-//  if (Bytes > 0)
-//  {
-//    Serial.println(""); Serial.println(Bytes);
-//  }
-
   if (Bytes > 32)
   {
     Bytes = 32;
@@ -348,7 +334,6 @@ void CheckGPS(void)
       {
         if (Length == 0)
         {
-          Serial.print("MISSED B5 ");
           Line[0] = 0xB5;
         }
         Line[1] = Character;
@@ -433,7 +418,7 @@ void CheckGPS(void)
         if (RequiredFlightMode != GPS.FlightMode)
         {
           SetFlightMode(RequiredFlightMode);
-          Serial.println("Setting flight mode\n");
+          // Serial.println("Setting flight mode\n");
         }
       break;
       
@@ -442,7 +427,7 @@ void CheckGPS(void)
         #ifdef POWERSAVING
           if (!GlonassMode)
           {
-            Serial.println("*** SetGNSSMode() ***");
+            // Serial.println("*** SetGNSSMode() ***");
             SetGNSSMode();
           }
           else
@@ -452,7 +437,7 @@ void CheckGPS(void)
             
             if (RequiredPowerMode != GPS.PowerMode)
             {
-              Serial.print("*** SetPowerMode("); Serial.print(RequiredPowerMode); Serial.println(") ***");
+              // Serial.print("*** SetPowerMode("); Serial.print(RequiredPowerMode); Serial.println(") ***");
               SetPowerMode(RequiredPowerMode);
             }
           }
@@ -466,4 +451,3 @@ void CheckGPS(void)
     }
   }
 }
-

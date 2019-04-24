@@ -45,6 +45,21 @@
 #define REG_DIO_MAPPING_1           0x40
 #define REG_DIO_MAPPING_2           0x41
 
+// FSK stuff
+#define REG_PREAMBLE_MSB_FSK        0x25
+#define REG_PREAMBLE_LSB_FSK        0x26
+#define REG_PACKET_CONFIG1          0x30
+#define REG_PAYLOAD_LENGTH_FSK      0x32
+#define REG_FIFO_THRESH             0x35
+#define REG_FDEV_MSB                0x04
+#define REG_FDEV_LSB                0x05
+#define REG_FRF_MSB                 0x06
+#define REG_FRF_MID                 0x07
+#define REG_FRF_LSB                 0x08
+#define REG_BITRATE_MSB             0x02
+#define REG_BITRATE_LSB             0x03
+#define REG_IRQ_FLAGS2              0x3F
+
 // MODES
 #define RF98_MODE_RX_CONTINUOUS     0x85
 #define RF98_MODE_TX                0x83
@@ -120,10 +135,29 @@ unsigned char Sentence[SENTENCE_LENGTH];
 unsigned long LastLoRaTX=0;
 unsigned long TimeToSendIfNoGPS=0;
 int CallingCount=0;
+int RTTYCount=0;
+int InRTTYMode=0;
+int SendingRTTY=0;
+int RTTYIndex, RTTYMask, RTTYLength;
+int FSKBitRate, FSKOverSample, RTTYBitLength;
 
 void SetupLoRa(void)
 {
   setupRFM98(LORA_FREQUENCY, LORA_MODE);
+
+  if (LORA_RTTY_BAUD == 50)
+  {
+    FSKBitRate = 40000;
+    FSKOverSample = 2;
+    RTTYBitLength = 7;
+  }
+  else
+  {
+    // 300 baud
+    FSKBitRate = 13333;
+    FSKOverSample = 1;
+    RTTYBitLength = 8;
+  }
 }
 
 void setupRFM98(double Frequency, int Mode)
@@ -150,7 +184,7 @@ void setupRFM98(double Frequency, int Mode)
   setLoRaMode();
 
   // Frequency
-  setFrequency(Frequency);
+  setFrequency(Frequency + LORA_OFFSET / 1000.0);
 
   // LoRa settings for various modes.  We support modes 2 (repeater mode), 1 (normally used for SSDV) and 0 (normal slow telemetry mode).
   
@@ -187,7 +221,6 @@ void setupRFM98(double Frequency, int Mode)
     LowDataRateOptimize = 0x08;		
   }
   
-
   PayloadLength = ImplicitOrExplicit == IMPLICIT_MODE ? 255 : 0;
 
   writeRegister(REG_MODEM_CONFIG, ImplicitOrExplicit | ErrorCoding | Bandwidth);
@@ -272,7 +305,6 @@ void setMode(byte newMode)
       break;
     default: return;
   } 
-  
   
   if(newMode != RF98_MODE_SLEEP){
     while(digitalRead(LORA_DIO5) == 0)
@@ -367,60 +399,6 @@ void CheckLoRaRx(void)
             TimeToSendIfNoGPS = millis() + Offset;
           }
         }
-        /*
-        else if ((Sentence[0] & 0xC0) == 0xC0)
-        {
-          // Binary downlink message
-          char Payload[32];
-          int SourceID;
-							
-          SourceID = Message[0] & 0x07;
-						
-          if (SourceID == LORA_ID)
-          {
-            Serial.println("Ignoring Binary Repeat");
-          }
-          else
-          {
-            Serial.print("Balloon Binary Message from sender "); Serial.println(SourceID);
-            
-            // Replace the sender ID with ours
-            Sentence[0] = Sentenceage[0] & 0xC7 | (LORA_ID << 3);
-            memcpy(&PacketToRepeat, Sentence, sizeof(PacketToRepeat));
-            RepeatedPacketType = 1;
-							
-            AirCount++;
-          }
-        }
-        else if ((Message[0] & 0xC0) == 0x80)
-        {
-          int SenderID, TargetID;
-						
-          TargetID = Message[0] & 0x07;
-          SenderID = (Message[0] >> 3) & 0x07;
-
-          Serial.print("Uplink from "); Serial.print(SenderID); Serial.print(" to "); Serial.print(TargetID); Serial.print(", Message "); Serial.println((char *)Message+1);
-									
-          if (TargetID == LORA_ID)
-          {
-            Serial.println("Message was for us!");
-            Serial.print("Message is "); Serial.println((char *)Message+1);
-              
-            GroundCount++;
-          }
-          else
-          {
-            Serial.println("Message is for another balloon");
-            Message[0] = Message[0] & 0xC7 | (LORA_ID << 3);
-            memcpy(&PacketToRepeat, Message, sizeof(PacketToRepeat));
-            RepeatedPacketType = 2;
-          }
-        }
-        else
-        {
-          Serial.print("Unknown message "); Serial.println((int)Message[0]);
-        }
-        */
       }
     }
   }
@@ -526,6 +504,12 @@ void SendLoRaPacket(unsigned char *buffer, int Length)
   
   LastLoRaTX = millis();
   TimeToSendIfNoGPS = 0;
+
+  if (InRTTYMode != 0)
+  {
+    setupRFM98(LORA_FREQUENCY, LORA_MODE);
+    InRTTYMode = 0;
+  }
   
   Serial.print("Sending "); Serial.print(Length);Serial.println(" bytes");
   
@@ -553,6 +537,7 @@ void SendLoRaPacket(unsigned char *buffer, int Length)
   setMode(RF98_MODE_TX);
   
   LoRaMode = lmSending;
+  SendingRTTY = 0;
 }
 
 void startReceiving(void)
@@ -626,37 +611,171 @@ int BuildLoRaPositionPacket(unsigned char *TxLine)
   return sizeof(struct TBinaryPacket);
 }
 
-void CheckLoRa(void)
+int FSKPacketSent(void)
 {
-  /*
-   if (LORA_CYCLETIME > 0)
-   {
-     // TDMA
-     static long LastCheckAt=-1;
-    int CurrentSeconds;
+  return ((readRegister(REG_IRQ_FLAGS2) & 0x48) != 0);
+}
 
-    if (GPS.Seconds != LastCheckAt)
+int FSKBufferLow(void)
+{
+  return (readRegister(REG_IRQ_FLAGS2) & 0x20) == 0;
+}
+
+
+void CheckFSKBuffer(void)
+{
+  if ((LoRaMode == lmSending) && SendingRTTY)
+  {
+    // Check if packet sent
+    if (FSKPacketSent())
     {
-      LastCheckAt = GPS.Seconds;
-      CurrentSeconds = GPS.Seconds % LORA_CYCLETIME;
-
-      if (CurrentSeconds == LORA_SLOT)
-      {
-        // Send our telemetry
-        char *Message = "$Hello world";
-      
-        SendLoRaPacket(Message, strlen(Message)+1);
-      }
-      else if (UplinkMessage[0] && (CurrentSeconds == LORA_REPEATSLOT))
-      {
-        SendLoRaPacket(UplinkMessage, strlen(UplinkMessage));
-        UplinkMessage[0] = '\0';
-      }
+      LoRaMode = lmIdle;
+      SendingRTTY = 0;
+    }
+    else if (FSKBufferLow())
+    {
+      AddBytesToFSKBuffer(64 - 20);
     }
   }
-  
-  */
+}
 
+void AddBytesToFSKBuffer(int MaxBytes)
+{
+  unsigned char data[65], temp;
+  int i;
+  uint8_t BytesWritten = 0;
+
+  if (RTTYIndex < RTTYLength)
+  {
+    data[BytesWritten++] = REG_FIFO | 0x80;
+    
+    while((BytesWritten <= (MaxBytes-FSKOverSample+1)) &&
+        (RTTYIndex < RTTYLength))
+    {
+      if (RTTYMask < 0)  //start bit
+      {
+        temp = 0xFF;
+        RTTYMask++;
+      }
+      else if (RTTYMask == 0)  //start bit
+      {
+        temp = 0;
+        RTTYMask = 1;
+      }
+      else if (RTTYMask >= (1<<RTTYBitLength))  //stop bits
+      {
+        RTTYMask <<= 1;
+        temp = 0xFF;
+        if (RTTYMask >= (1<<(RTTYBitLength+2)))
+        {
+          RTTYMask = 0;
+          RTTYIndex++;
+        }
+      }
+      else  //databits
+      {
+        if (Sentence[RTTYIndex] & RTTYMask)
+        {
+          temp = 0xFF;
+        }
+        else
+        {
+          temp = 0x0;
+        }
+        RTTYMask <<= 1;
+      }
+
+      for (i = 0; i < FSKOverSample; i++)
+      {
+        data[BytesWritten++] = temp;
+      }
+    }
+
+
+    select();
+
+    for (i = 0; i < BytesWritten; i++)
+    {
+      SPI.transfer(data[i]);
+    }
+    unselect();
+  }
+}
+
+void SwitchToFSKMode(void)
+{
+  unsigned long FrequencyValue;
+  
+  uint8_t mode = readRegister(REG_OPMODE);
+  mode |= (1<<3);                           //set LF range
+
+  if (mode & (1<<7))  //if in lora mode
+  {
+    writeRegister(REG_OPMODE,(mode & ~(uint8_t)7));    //set to sleep mode so fsk bit can be written
+  }
+  else
+  {
+    writeRegister(REG_OPMODE,(mode & ~(uint8_t)7) | 1);  //set to standby mode so various settings can be written  
+  }
+
+  mode = readRegister(REG_OPMODE);
+  writeRegister(REG_OPMODE, mode & ~(uint8_t)(7<<5));         //set to FSK
+
+  writeRegister(REG_LNA, LNA_OFF_GAIN);  // TURN LNA OFF FOR TRANSMIT
+  writeRegister(REG_PA_CONFIG, PA_MAX_UK);
+    
+  // Frequency
+  FrequencyValue = (unsigned long)(LORA_RTTY_FREQ * 7110656 / 434);
+  writeRegister(REG_FRF_MSB, (FrequencyValue >> 16) & 0xFF);   // Set frequency
+  writeRegister(REG_FRF_MID, (FrequencyValue >> 8) & 0xFF);
+  writeRegister(REG_FRF_LSB, FrequencyValue & 0xFF);
+  
+  //write modem config
+  writeRegister(REG_BITRATE_LSB, FSKBitRate & 0xFF);
+  writeRegister(REG_BITRATE_MSB, (FSKBitRate >> 8) & 0xFF);
+  writeRegister(REG_FDEV_LSB, (LORA_RTTY_SHIFT / 122) & 0xFF);
+  writeRegister(REG_FDEV_MSB, 0);
+  writeRegister(REG_PREAMBLE_LSB_FSK, 0);    // Preamble
+  writeRegister(REG_PREAMBLE_MSB_FSK, 0);
+  
+  // writeRegister(REG_PACKET_CONFIG1, 0x80);    // variable length, no DC fix, no CRC, no addressing
+  writeRegister(REG_PACKET_CONFIG1, 0x00);   // fixed length, no DC fix, no CRC, no addressing
+  writeRegister(REG_PAYLOAD_LENGTH_FSK, 0);
+}
+
+void SendLoRaRTTY(int Length)
+{
+  if (InRTTYMode != 1)
+  {
+    // Set RTTY mode
+    SwitchToFSKMode();
+    InRTTYMode = 1;
+  }
+
+  // Fill in RTTY buffer
+  // memcpy(RTTYBuffer, buffer, Length);
+  RTTYLength = Length;
+  RTTYIndex = 0;
+  RTTYMask = -LORA_RTTY_PREAMBLE;
+  
+  // Set FIFO threshold
+  uint8_t r = readRegister(REG_FIFO_THRESH); 
+  writeRegister(REG_FIFO_THRESH,(r&(~0x3F)) | 20);     // 20 = FIFO threshold
+  
+  writeRegister(REG_OPMODE, 0x0B);   // Tx mode
+
+  // Populate FIFO
+  AddBytesToFSKBuffer(64);
+  
+  // Set channel state
+  LoRaMode = lmSending;
+  SendingRTTY = 1;
+}
+
+void CheckLoRa(void)
+{
+  CheckFSKBuffer();
+  
   CheckLoRaRx();
 		
   if (LoRaIsFree())
@@ -694,35 +813,50 @@ void CheckLoRa(void)
     else			
     {
       int PacketLength;
-				
-      if ((LORA_CALL_COUNT > 0) && (++CallingCount >= LORA_CALL_COUNT))
-	    {
-		    CallingCount = 0;
-		    setupRFM98(LORA_CALL_FREQ, LORA_CALL_MODE);
-        PacketLength = BuildLoRaCall((char *)Sentence);
-		    Serial.println(F("LoRa: Calling Mode"));
-	    }
-      else
-	    {
-		    if ((LORA_CALL_COUNT > 0) && (CallingCount == 1))
-		    {
-			    setupRFM98(LORA_FREQUENCY, LORA_MODE);
-		    }
-		
-	      if (LORA_BINARY)
-        {
-          // 0x80 | (LORA_ID << 3) | TargetID
-          PacketLength = BuildLoRaPositionPacket(Sentence);
-		      Serial.println(F("LoRa: Tx Binary packet"));
-        }
-        else
-        {
-          PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
-	        Serial.println(F("LoRa: Tx ASCII Sentence"));
-		    }
+
+      if (++RTTYCount >= (LORA_RTTY_COUNT + LORA_RTTY_EVERY))
+      {
+        RTTYCount = 0;
       }
-							
-      SendLoRaPacket(Sentence, PacketLength);		
+            
+      if (RTTYCount < LORA_RTTY_COUNT)
+      {
+        // Send RTTY packet
+        PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
+        Serial.println(F("LoRa: Tx RTTY packet"));
+        SendLoRaRTTY(PacketLength);    
+      }
+      else
+      {
+        if ((LORA_CALL_COUNT > 0) && (++CallingCount > LORA_CALL_COUNT))
+  	    {
+  		    CallingCount = 0;
+  		    setupRFM98(LORA_CALL_FREQ, LORA_CALL_MODE);
+          PacketLength = BuildLoRaCall((char *)Sentence);
+  		    Serial.println(F("LoRa: Calling Mode"));
+  	    }
+        else
+  	    {
+  		    if ((LORA_CALL_COUNT > 0) && (CallingCount == 1))
+  		    {
+  			    setupRFM98(LORA_FREQUENCY, LORA_MODE);
+  		    }
+  		
+  	      if (LORA_BINARY)
+          {
+            // 0x80 | (LORA_ID << 3) | TargetID
+            PacketLength = BuildLoRaPositionPacket(Sentence);
+  		      Serial.println(F("LoRa: Tx Binary packet"));
+          }
+          else
+          {
+            PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
+  	        Serial.println(F("LoRa: Tx ASCII Sentence"));
+  		    }
+        }
+  							
+        SendLoRaPacket(Sentence, PacketLength);		
+      }
     }
   }
 }
