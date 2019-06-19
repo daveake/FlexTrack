@@ -725,7 +725,7 @@ void SwitchToFSKMode(void)
   writeRegister(REG_PA_CONFIG, PA_MAX_UK);
     
   // Frequency
-  FrequencyValue = (unsigned long)(LORA_RTTY_FREQ * 7110656 / 434);
+  FrequencyValue = (unsigned long)((LORA_RTTY_FREQ + (LORA_OFFSET / 1000.0)) * 7110656 / 434);
   writeRegister(REG_FRF_MSB, (FrequencyValue >> 16) & 0xFF);   // Set frequency
   writeRegister(REG_FRF_MID, (FrequencyValue >> 8) & 0xFF);
   writeRegister(REG_FRF_LSB, FrequencyValue & 0xFF);
@@ -832,7 +832,7 @@ void CheckLoRa(void)
   	    {
   		    CallingCount = 0;
   		    setupRFM98(LORA_CALL_FREQ, LORA_CALL_MODE);
-          PacketLength = BuildLoRaCall((char *)Sentence);
+          PacketLength = BuildLoRaCall(Sentence);
   		    Serial.println(F("LoRa: Calling Mode"));
   	    }
         else

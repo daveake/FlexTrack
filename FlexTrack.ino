@@ -20,8 +20,8 @@
 // Edit this section to choose the hardware design and set your payload ID etc
 
 // CHOOSE BOARD (comment out one of these only)
-#define HABDUINO
-// #define UAVANUT_LORA
+// #define HABDUINO
+#define UAVANUT_LORA
 // #define HS_APRS_300
 // #define HS_RTTY_300      
 
@@ -35,16 +35,16 @@
 #define POWERSAVING	                      // Comment out to disable GPS power saving
 
 // LORA settings
-#define LORA_PAYLOAD_ID   "CHANGEME"            // Do not use spaces.
+#define LORA_PAYLOAD_ID   "ZURG"            // Do not use spaces.
 #define LORA_SLOT            -1
 #define LORA_REPEAT_SLOT_1   -1
 #define LORA_REPEAT_SLOT_2   -1
 
-#define LORA_RTTY_FREQ      434.400               // For devices that are frequency-agile
-#define LORA_RTTY_BAUD       50
+#define LORA_RTTY_FREQ    434.400               // For devices that are frequency-agile
+#define LORA_RTTY_BAUD       300
 #define LORA_RTTY_SHIFT      488
-#define LORA_RTTY_COUNT       0           // n RTTY packets.  Set to 0 to disable
-#define LORA_RTTY_EVERY       2           // After every n LoRa packets
+#define LORA_RTTY_COUNT       2           // n RTTY packets.  Set to 0 to disable
+#define LORA_RTTY_EVERY       3           // After every n LoRa packets
 #define LORA_RTTY_PREAMBLE    8
 
 #define LORA_TIME_INDEX      2
@@ -60,7 +60,7 @@
 #define LORA_BINARY          0
 #define LORA_CALL_FREQ 		433.650
 #define LORA_CALL_MODE		 5				
-#define LORA_CALL_COUNT		 2				// Set to zero to disable calling mode
+#define LORA_CALL_COUNT		 10				// Set to zero to disable calling mode
 
 // APRS settings
 #define APRS_CALLSIGN    "CHANGE"               // Max 6 characters
@@ -75,6 +75,10 @@
                                                // Set to 0 to disable
 #define APRS_COMMENT     "www.daveakerman.com"   
 #define APRS_TELEM_INTERVAL  2                // How often to send telemetry packets.  Comment out to disable
+
+// Cutdown settings
+// #define CUTDOWN             A2
+
 
 //------------------------------------------------------------------------------------------------------
 
@@ -154,8 +158,8 @@
 #define EXTRA_FIELD_FORMAT    ",%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
 #define EXTRA_FIELD_LIST           ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites
 
-// #define EXTRA_FIELD_FORMAT      ",%d,%d,%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
-// #define EXTRA_FIELD_LIST            ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites, DS18B20_Temperatures[0], Channel0Average
+// #define EXTRA_FIELD_FORMAT      ",%d,%d,%d,%d,%d,%d"          // List of formats for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
+// #define EXTRA_FIELD_LIST            ,(int)((GPS.Speed * 13) / 7), GPS.Direction, GPS.Satellites, DS18B20_Temperatures[0], Channel0Average, GPS.CutdownStatus
                                                                 // List of variables/expressions for extra fields. Make empty if no such fields.  Always use comma at start of there are any such fields.
 #define SENTENCE_LENGTH      100                  // This is more than sufficient for the standard sentence.  Extend if needed; shorten if you are tight on memory.
 
@@ -206,6 +210,7 @@ struct TGPS
   unsigned int errorstatus;
   byte FlightMode;
   byte PowerMode;
+  int CutdownStatus;
 } GPS;
 
 
@@ -267,6 +272,10 @@ void setup()
 
   SetupLEDs();
   
+#ifdef CUTDOWN
+  SetupCutdown();
+#endif
+
   SetupGPS();
   
   SetupADC();
@@ -294,6 +303,10 @@ void setup()
 void loop()
 {  
   CheckGPS();
+
+#ifdef CUTDOWN
+  CheckCutdown();
+#endif
 
 #ifdef RTTY_BAUD
 #ifdef RTTY_DATA

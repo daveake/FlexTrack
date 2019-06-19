@@ -4,7 +4,13 @@ Flexible Arduino-based tracker software for RTTY, LoRa and APRS.
 
 This fork is configured for Habduino V4.X boards. 
 
-This code provides simultaneous (where legal and supported by the hardware installed) transmission of radio telemetry via RTTY and APRS on Habduino Arduino addon boards for High Altitude Ballooning. 
+This code provides simultaneous (where legal and supported by the hardware installed) transmission of radio telemetry via RTTY and APRS on Habduino Arduino addon boards for High Altitude Ballooning.
+
+## Libraries
+
+To build FlexTrack for use with a HABDuino or other tracker using I2C communications, you need to install this library into your Arduino IDE:
+
+[https://github.com/rambo/I2C](https://github.com/rambo/I2C) 
 
 ## Disclaimer
 
