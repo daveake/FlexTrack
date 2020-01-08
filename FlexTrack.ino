@@ -20,8 +20,8 @@
 // Edit this section to choose the hardware design and set your payload ID etc
 
 // CHOOSE BOARD (comment out one of these only)
-// #define HABDUINO
-#define UAVANUT_LORA
+#define HABDUINO
+// #define UAVANUT_LORA
 // #define HS_APRS_300
 // #define HS_RTTY_300      
 
@@ -35,7 +35,7 @@
 #define POWERSAVING	                      // Comment out to disable GPS power saving
 
 // LORA settings
-#define LORA_PAYLOAD_ID   "ZURG"            // Do not use spaces.
+#define LORA_PAYLOAD_ID   "CHANGE_ME"            // Do not use spaces.
 #define LORA_SLOT            -1
 #define LORA_REPEAT_SLOT_1   -1
 #define LORA_REPEAT_SLOT_2   -1
