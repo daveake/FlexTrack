@@ -17,11 +17,6 @@
 |                                                     |
 \*---------------------------------------------------*/
 
-#ifdef LORA_NSS
-
-#include <SPI.h>
-#include <string.h>
-
 // RFM98 registers
 #define REG_FIFO                    0x00
 #define REG_OPMODE                  0x01
@@ -119,6 +114,11 @@
 #define REG_LNA                     0x0C
 #define LNA_MAX_GAIN                0x23  // 0010 0011
 #define LNA_OFF_GAIN                0x00
+
+#ifdef LORA_NSS
+
+#include <SPI.h>
+#include <string.h>
 
 typedef enum {lmIdle, lmListening, lmSending} tLoRaMode;
 
