@@ -498,19 +498,29 @@ int LoRaIsFree(void)
   return 0;
 }
 
-void SendLoRaPacket(unsigned char *buffer, int Length)
+void SendLoRaPacket(unsigned char *buffer, int Length, int CallingPacket)
 {
   int i;
   
   LastLoRaTX = millis();
   TimeToSendIfNoGPS = 0;
 
-  if (InRTTYMode != 0)
+//  if (InRTTYMode != 0)
+//  {
+//    setupRFM98(LORA_FREQUENCY, LORA_MODE);
+//    InRTTYMode = 0;
+//  }
+  InRTTYMode = 0;
+
+  if (CallingPacket)
+  {
+    setupRFM98(LORA_CALL_FREQ, LORA_CALL_MODE);
+  }
+  else
   {
     setupRFM98(LORA_FREQUENCY, LORA_MODE);
-    InRTTYMode = 0;
   }
-  
+   
   Serial.print("Sending "); Serial.print(Length);Serial.println(" bytes");
   
   setMode(RF98_MODE_STANDBY);
@@ -785,7 +795,7 @@ void CheckLoRa(void)
     {
       // Repeat ASCII sentence
       Sentence[0] = '%';
-      SendLoRaPacket(Sentence, strlen((char *)Sentence)+1);
+      SendLoRaPacket(Sentence, strlen((char *)Sentence)+1, 0);
 				
       RepeatedPacketType = 0;
       SendRepeatedPacket = 0;
@@ -795,7 +805,7 @@ void CheckLoRa(void)
       Serial.println(F("Repeating uplink packet"));
 				
         // 0x80 | (LORA_ID << 3) | TargetID
-      SendLoRaPacket((unsigned char *)&PacketToRepeat, sizeof(PacketToRepeat));
+      SendLoRaPacket((unsigned char *)&PacketToRepeat, sizeof(PacketToRepeat), 0);
 				
       RepeatedPacketType = 0;
       SendRepeatedPacket = 0;
@@ -804,8 +814,7 @@ void CheckLoRa(void)
     {
       Serial.println(F("Repeating balloon packet"));
 				
-        // 0x80 | (LORA_ID << 3) | TargetID
-      SendLoRaPacket((unsigned char *)&PacketToRepeat, sizeof(PacketToRepeat));
+      // 0x80 | (LORA_ID << 3) | TargetID
 				
       RepeatedPacketType = 0;
       SendRepeatedPacket = 0;
@@ -834,13 +843,14 @@ void CheckLoRa(void)
   		    setupRFM98(LORA_CALL_FREQ, LORA_CALL_MODE);
           PacketLength = BuildLoRaCall(Sentence);
   		    Serial.println(F("LoRa: Calling Mode"));
+          SendLoRaPacket(Sentence, PacketLength, 1);
   	    }
         else
   	    {
-  		    if ((LORA_CALL_COUNT > 0) && (CallingCount == 1))
-  		    {
-  			    setupRFM98(LORA_FREQUENCY, LORA_MODE);
-  		    }
+//  		    if ((LORA_CALL_COUNT > 0) && (CallingCount == 1))
+//  		    {
+//  			    setupRFM98(LORA_FREQUENCY, LORA_MODE);
+//  		    }
   		
   	      if (LORA_BINARY)
           {
@@ -853,9 +863,8 @@ void CheckLoRa(void)
             PacketLength = BuildSentence((char *)Sentence, LORA_PAYLOAD_ID);
   	        Serial.println(F("LoRa: Tx ASCII Sentence"));
   		    }
+          SendLoRaPacket(Sentence, PacketLength, 0);  
         }
-  							
-        SendLoRaPacket(Sentence, PacketLength);		
       }
     }
   }

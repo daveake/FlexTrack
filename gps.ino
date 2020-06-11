@@ -182,7 +182,7 @@ void ProcessUBX_NAV_PVT(unsigned char *Buffer, int Length)
     GPS.Minutes = UBlox->Minutes; // (GPS.SecondsInDay / 60) % 60;
     GPS.Seconds = UBlox->Seconds; // GPS.SecondsInDay % 60;  
     
-    if ((UBlox->FixType >= 1) && (UBlox->FixType <= 4))
+    if ((UBlox->FixType >= 2) && (UBlox->FixType <= 4))
     {
       GPS.Longitude = (float)(UBlox->Longitude) / 10000000;
       GPS.Latitude = (float)(UBlox->Latitude) / 10000000;

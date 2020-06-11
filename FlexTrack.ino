@@ -35,7 +35,7 @@
 #define POWERSAVING	                      // Comment out to disable GPS power saving
 
 // LORA settings
-#define LORA_PAYLOAD_ID   "ZURG"            // Do not use spaces.
+#define LORA_PAYLOAD_ID   "CHANGE_ME"            // Do not use spaces.
 #define LORA_SLOT            -1
 #define LORA_REPEAT_SLOT_1   -1
 #define LORA_REPEAT_SLOT_2   -1
