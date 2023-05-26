@@ -66,7 +66,7 @@
 #define APRS_CALLSIGN    "CHANGE"               // Max 6 characters
 #define APRS_SSID            11
 #define APRS_PATH_ALTITUDE   1500              // Below this altitude, ** in metres **, path will switch to WIDE1-1, WIDE2-1.  Above it will be or path or WIDE2-1 (see below)
-#define APRS_HIGH_USE_WIDE2    1                 // 1 means WIDE2-1 is used at altitude; 0 means no path is used
+#define APRS_HIGH_USE_WIDE2    0                 // 1 means WIDE2-1 is used at altitude; 0 means no path is used
 
 #define APRS_TX_INTERVAL      1                 // APRS TX Interval in minutes
 #define APRS_PRE_EMPHASIS                      // Comment out to disable 3dB pre-emphasis.
